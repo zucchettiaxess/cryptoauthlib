@@ -33,7 +33,7 @@
 
 /* See https://csrc.nist.gov/projects/cryptographic-algorithm-validation-program/digital-signatures */
 
-#ifndef ATCA_NO_PRAGMA_PACK
+#if !defined(ATCA_NO_PRAGMA_PACK) && !defined(ATCA_VECTOR_NO_PRAGMA_PACK)
 #pragma pack(push, 1)
 #endif
 
@@ -85,7 +85,12 @@ typedef struct ATCA_PACKED
 extern const ecdsa_p384_test_vector ecdsa_p384_s256_test_vectors[];
 extern const size_t ecdsa_p384_s256_test_vectors_count;
 #endif
-#endif /* TEST_VECTOR_EC_P384_EN */
+
+#if TEST_VECTOR_SHA2_384_EN
+extern const ecdsa_p384_test_vector ecdsa_p384_test_vectors[];
+extern const size_t ecdsa_p384_test_vectors_count;
+#endif
+#endif
 
 #if TEST_VECTOR_EC_P521_EN
 typedef struct ATCA_PACKED
@@ -103,7 +108,7 @@ extern const ecdsa_p521_test_vector ecdsa_p521_test_vectors[];
 extern const size_t ecdsa_p521_test_vectors_count;
 #endif
 
-#ifndef ATCA_NO_PRAGMA_PACK
+#if !defined(ATCA_NO_PRAGMA_PACK) && !defined(ATCA_VECTOR_NO_PRAGMA_PACK)
 #pragma pack(pop)
 #endif
 

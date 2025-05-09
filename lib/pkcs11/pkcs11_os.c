@@ -74,8 +74,25 @@ CK_RV pkcs11_os_alloc_shared_ctx(void ** ppShared, size_t size)
 {
     ATCA_STATUS status = ATCA_GEN_FAIL;
 
-#if defined(_WIN32) || defined(__linux__) || defined(__APPLE__)
+#if ((defined(__linux__) || defined(__APPLE__)) && defined(ATCA_USE_SHARED_MUTEX))
     bool initialized = false;
+    void *pMutex = NULL;
+
+    // Create the system-wide mutex
+    status = hal_create_mutex(&pMutex, ATCA_SHARED_MUTEX_NAME);
+    if (status != ATCA_SUCCESS)
+    {
+        return pkcs11_util_convert_rv(status);
+    }
+
+    // Lock the mutex before calling hal_alloc_shared
+    status = hal_lock_mutex(pMutex);
+    if (status != ATCA_SUCCESS)
+    {
+        return pkcs11_util_convert_rv(hal_free_shared(pMutex, sizeof(hal_mutex_t)));
+    }
+
+    // Allocate shared memory
     if (ATCA_SUCCESS == (status = hal_alloc_shared(ppShared, size, "atpkcs11_3_6", &initialized)))
     {
         if (initialized)
@@ -83,6 +100,12 @@ CK_RV pkcs11_os_alloc_shared_ctx(void ** ppShared, size_t size)
             status = hal_init_mutex(*ppShared, true);
         }
     }
+
+    // Unlock the mutex after the critical section
+    status = hal_unlock_mutex(pMutex);
+
+    return pkcs11_util_convert_rv(hal_free_shared(pMutex, sizeof(hal_mutex_t)));
+
 #else
     if (ppShared)
     {
@@ -106,7 +129,7 @@ CK_RV pkcs11_os_free_shared_ctx(void * pShared, size_t size)
 {
     ATCA_STATUS status = ATCA_GEN_FAIL;
 
-#if defined(_WIN32) || defined(__linux__) || defined(__APPLE__)
+#if ((defined(__linux__) || defined(__APPLE__)) && defined(ATCA_USE_SHARED_MUTEX))
     status = hal_free_shared(pShared, size);
 #elif defined(ATCA_NO_HEAP)
     ((void)pShared);

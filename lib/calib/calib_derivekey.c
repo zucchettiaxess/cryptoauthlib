@@ -48,18 +48,19 @@
  */
 ATCA_STATUS calib_derivekey(ATCADevice device, uint8_t mode, uint16_t target_key, const uint8_t* mac)
 {
-    ATCAPacket packet;
-    ATCA_STATUS status = ATCA_GEN_FAIL;
+    ATCAPacket * packet = NULL;
+    ATCA_STATUS status;
     bool require_mac = false;
 
     do
     {
+#if ATCA_CHECK_PARAMS_EN
         if (device == NULL)
         {
             status = ATCA_TRACE(ATCA_BAD_PARAM, "NULL pointer received");
             break;
         }
-
+#endif
         #if (CA_MAX_PACKET_SIZE < (ATCA_CMD_SIZE_MIN + MAC_SIZE))
         #if ATCA_PREPROCESSOR_WARNING
         #warning "CA_MAX_PACKET_SIZE will not support optional mac with the derivekey command"
@@ -71,13 +72,23 @@ ATCA_STATUS calib_derivekey(ATCADevice device, uint8_t mode, uint16_t target_key
         }
         #endif
 
+        packet = calib_packet_alloc();
+        if(NULL == packet)
+        {
+            (void)ATCA_TRACE(ATCA_ALLOC_FAILURE, "calib_packet_alloc - failed");
+            status = ATCA_ALLOC_FAILURE;
+            break;
+        }
+
+        (void)memset(packet, 0x00, sizeof(ATCAPacket));
+
         // build a deriveKey command (pass through mode)
-        packet.param1 = mode;
-        packet.param2 = target_key;
+        packet->param1 = mode;
+        packet->param2 = target_key;
 
         if (mac != NULL)
         {
-            (void)memcpy(packet.data, mac, MAC_SIZE);
+            (void)memcpy(packet->data, mac, MAC_SIZE);
         }
 
         if (mac != NULL)
@@ -85,21 +96,21 @@ ATCA_STATUS calib_derivekey(ATCADevice device, uint8_t mode, uint16_t target_key
             require_mac = true;
         }
 
-        if ((status = atDeriveKey(atcab_get_device_type_ext(device), &packet, require_mac)) != ATCA_SUCCESS)
+        if ((status = atDeriveKey(atcab_get_device_type_ext(device), packet, require_mac)) != ATCA_SUCCESS)
         {
             (void)ATCA_TRACE(status, "atDeriveKey - failed");
             break;
         }
 
-        if ((status = atca_execute_command(&packet, device)) != ATCA_SUCCESS)
+        if ((status = atca_execute_command(packet, device)) != ATCA_SUCCESS)
         {
             (void)ATCA_TRACE(status, "calib_derivekey - execution failed");
             break;
         }
 
-    }
-    while (false);
+    } while (false);
 
+    calib_packet_free(packet);
     return status;
 }
 #endif /* CALIB_DERIVEKEY_EN */

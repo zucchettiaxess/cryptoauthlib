@@ -1,7 +1,8 @@
 /**
  * \file
+ * \brief Tests to cover hal layer functionality
  *
- * \copyright (c) 2015-2020 Microchip Technology Inc. and its subsidiaries.
+ * \copyright (c) 2015-2023 Microchip Technology Inc. and its subsidiaries.
  *
  * \page License
  *
@@ -23,32 +24,27 @@
  * THE AMOUNT OF FEES, IF ANY, THAT YOU HAVE PAID DIRECTLY TO MICROCHIP FOR
  * THIS SOFTWARE.
  */
+
+#ifndef TEST_HAL_H_
+#define TEST_HAL_H_
+
 #include "atca_test.h"
-#ifndef DO_NOT_TEST_CERT
 
-#ifdef __GNUC__
-// Unity macros trigger this warning
-#pragma GCC diagnostic ignored "-Wnested-externs"
+#ifdef __cplusplus
+extern "C" {
 #endif
 
-TEST_GROUP_RUNNER(atcacert_der_enc_length)
-{
-    RUN_TEST_CASE(atcacert_der_enc_length, short_form);
-    RUN_TEST_CASE(atcacert_der_enc_length, long_form_2byte);
-    RUN_TEST_CASE(atcacert_der_enc_length, long_form_3byte);
-    RUN_TEST_CASE(atcacert_der_enc_length, long_form_4byte);
-    RUN_TEST_CASE(atcacert_der_enc_length, long_form_5byte);
-    RUN_TEST_CASE(atcacert_der_enc_length, small_buf);
-    RUN_TEST_CASE(atcacert_der_enc_length, bad_params);
-}
 
-TEST_GROUP_RUNNER(atcacert_der_dec_length)
-{
-    RUN_TEST_CASE(atcacert_der_dec_length, good);
-    RUN_TEST_CASE(atcacert_der_dec_length, zero_size);
-    RUN_TEST_CASE(atcacert_der_dec_length, not_enough_data);
-    RUN_TEST_CASE(atcacert_der_dec_length, indefinite_form);
-    RUN_TEST_CASE(atcacert_der_dec_length, too_large);
-    RUN_TEST_CASE(atcacert_der_dec_length, bad_params);
+/* Test Commands */
+int hal_tests(int argc, char* argv[]);
+
+/* Common test setup/teardown */
+extern const char* TEST_GROUP_hal;
+void TEST_hal_SETUP(void);
+void TEST_hal_TEAR_DOWN(void);
+
+#ifdef __cplusplus
 }
 #endif
+
+#endif /* TEST_HAL_H_*/

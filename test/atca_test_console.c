@@ -27,8 +27,12 @@
 
 #include "cryptoauthlib.h"
 #include "atca_test.h"
-#include "api_atcab/test_atcab.h"
 #include "api_crypto/test_crypto.h"
+#include "atcacert/test_atcacert.h"
+
+#ifndef LIBRARY_USAGE_EN
+#include "api_atcab/test_atcab.h"
+#endif
 
 #ifndef ATCA_SERIAL_NUM_SIZE
 #define ATCA_SERIAL_NUM_SIZE        (9)
@@ -48,6 +52,7 @@ int run_helper_tests(int argc, char* argv[])
     return run_test(argc, argv, RunAllHelperTests);
 }
 
+#ifndef LIBRARY_USAGE_EN
 int read_config(int argc, char* argv[])
 {
     ATCA_STATUS status;
@@ -106,6 +111,7 @@ int read_config(int argc, char* argv[])
 
     return 0;
 }
+#endif
 
 int lock_status(int argc, char* argv[])
 {
@@ -132,6 +138,7 @@ int lock_status(int argc, char* argv[])
     return (int)status;
 }
 
+#ifndef LIBRARY_USAGE_EN
 int lock_config(int argc, char* argv[])
 {
     int ret = lock_config_zone(argc, argv);
@@ -153,6 +160,7 @@ int lock_data(int argc, char* argv[])
     }
     return ret;
 }
+#endif
 
 int do_randoms(int argc, char* argv[])
 {
@@ -245,17 +253,25 @@ int read_sernum(int argc, char* argv[])
     return status;
 }
 
-#if defined(ATCA_ECC_SUPPORT) && !defined(DO_NOT_TEST_CERT)
-void RunAllCertDataTests(void);
-int certdata_unit_tests(int argc, char* argv[])
+#ifndef DO_NOT_TEST_CERT
+void run_all_cert_data_tests(void)
 {
-    return run_test(argc, argv, RunAllCertDataTests);
+    RunAllTests(atcacert_data_test_list);
 }
 
-void RunAllCertIOTests(void);
+int certdata_unit_tests(int argc, char* argv[])
+{
+    return run_test(argc, argv, run_all_cert_data_tests);
+}
+
+void run_all_cert_io_tests(void)
+{
+    RunAllTests(atcacert_io_test_list);
+}
+
 int certio_unit_tests(int argc, char* argv[])
 {
-    return run_test(argc, argv, RunAllCertIOTests);
+    return run_test(argc, argv, run_all_cert_io_tests);
 }
 #endif
 
@@ -291,6 +307,7 @@ ATCA_STATUS is_data_locked(bool* isLocked)
     return status;
 }
 
+#ifndef LIBRARY_USAGE_EN
 int lock_config_zone(int argc, char* argv[])
 {
     ATCA_STATUS status;
@@ -428,6 +445,7 @@ ATCA_STATUS get_serial_no(uint8_t* sernum)
 
     return status;
 }
+#endif
 
 int run_all_tests(int argc, char* argv[])
 {
@@ -545,22 +563,19 @@ int run_all_tests(int argc, char* argv[])
     }
 #endif
 
-#if !defined(DO_NOT_TEST_CERT) && defined(ATCA_ECC_SUPPORT)
-    if (atIsECCFamily(gCfg->devtype))
+#ifndef DO_NOT_TEST_CERT
+    fails += run_test(argc, argv, run_all_cert_io_tests);
+    if (fails > 0)
     {
-        fails += run_test(argc, argv, RunAllCertIOTests);
-        if (fails > 0)
-        {
-            printf("cio tests failed.\r\n");
-            return 0;
-        }
+        printf("cio tests failed.\r\n");
+        return 0;
     }
     else
     {
         printf("cio tests don't apply to non-ECC devices.\r\n");
     }
 
-    fails += run_test(argc, argv, RunAllCertDataTests);
+    fails += run_test(argc, argv, run_all_cert_data_tests);
     if (fails > 0)
     {
         printf("cd tests failed.\r\n");
@@ -577,8 +592,12 @@ int run_tng_tests(int argc, char* argv[])
     ATCA_STATUS status;
 
     ATCA_IFACECFG_VALUE(gCfg, atcahid.dev_interface) = ATCA_KIT_I2C_IFACE;
-    ATCA_IFACECFG_VALUE(gCfg, atcahid.dev_identity) = 0x6C;
-
+    // Set default address if dev_identity is not set
+    if (0 == ATCA_IFACECFG_VALUE(gCfg, atcahid.dev_identity))
+    {
+        ATCA_IFACECFG_VALUE(gCfg, atcahid.dev_identity) = 0x6C;
+    }
+    
     status = atcab_init(gCfg);
     if (status != ATCA_SUCCESS)
     {

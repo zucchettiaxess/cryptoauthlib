@@ -36,7 +36,18 @@
 
 /** Library Configuration File - All build attributes should be included in
     atca_config.h */
-#include "atca_config.h"
+#if defined(LIBRARY_BUILD_EN)
+    #define LIBRARY_BUILD_EN_CHECK 1
+#else
+    #define LIBRARY_BUILD_EN_CHECK 0
+    #include "atca_config.h"
+#endif
+
+#if defined(LIBRARY_USAGE_EN)
+    #define LIBRARY_USAGE_EN_CHECK 1
+#else
+    #define LIBRARY_USAGE_EN_CHECK 0
+#endif
 
 /* Configuration Macros to detect device classes */
 #if defined(ATCA_ATSHA204A_SUPPORT) || defined(ATCA_ATSHA206A_SUPPORT) || defined(ATCA_SHA104_SUPPORT) || defined(ATCA_SHA105_SUPPORT)
@@ -52,6 +63,8 @@
 #if defined(ATCA_ATECC108A_SUPPORT) || defined(ATCA_ATECC508A_SUPPORT) \
     || defined(ATCA_ATECC608_SUPPORT)
 #define ATCA_ECC_SUPPORT    DEFAULT_ENABLED
+#else
+#define ATCA_ECC_SUPPORT    DEFAULT_DISABLED
 #endif
 
 /* Support for a second generation of cryptoauth parts */
@@ -61,8 +74,15 @@
 #define ATCA_CA2_SUPPORT    DEFAULT_DISABLED
 #endif
 
+/* Support for cert feature in second generation of cryptoauth parts */
+#if defined(ATCA_ECC204_SUPPORT) || defined(ATCA_TA010_SUPPORT)
+#define ATCA_CA2_CERT_SUPPORT    DEFAULT_ENABLED
+#else
+#define ATCA_CA2_CERT_SUPPORT    DEFAULT_DISABLED
+#endif
+
 /* Classic Cryptoauth Devices */
-#if defined(ATCA_SHA_SUPPORT) || defined(ATCA_ECC_SUPPORT) || ATCA_CA2_SUPPORT
+#if defined(ATCA_SHA_SUPPORT) || ATCA_ECC_SUPPORT || ATCA_CA2_SUPPORT
 #define ATCA_CA_SUPPORT     DEFAULT_ENABLED
 #else
 #define ATCA_CA_SUPPORT     DEFAULT_DISABLED
@@ -70,7 +90,7 @@
 
 /* New Trust Anchor Devices */
 #ifndef ATCA_TA_SUPPORT
-#if defined(ATCA_TA100_SUPPORT)
+#if defined(ATCA_TA100_SUPPORT) || defined(ATCA_TA101_SUPPORT)
 #define ATCA_TA_SUPPORT     DEFAULT_ENABLED
 #else
 #define ATCA_TA_SUPPORT     DEFAULT_DISABLED
@@ -103,7 +123,7 @@
 /* Continues when the condition is true - emits message if the condition is false */
 #define ATCA_CHECK_VALID_MSG(c, m)          if (!ATCA_TRACE(!(c), m))
 #else
-#define ATCA_CHECK_INVALID_MSG(c, s, m)
+#define ATCA_CHECK_INVALID_MSG(c, s, m)     
 #define ATCA_CHECK_VALID_MSG(c, m)          if (1)
 #endif
 
@@ -115,6 +135,17 @@
  */
 #ifndef MULTIPART_BUF_EN
 #define MULTIPART_BUF_EN        (DEFAULT_DISABLED)
+#endif
+
+#ifndef ATCA_NO_HEAP
+#define ATCA_HEAP
+#endif
+
+/** \def ATCA_UNUSED_VAR_CHECK
+ * Enables removal of compiler warning due to unused variables
+ */
+#ifndef ATCA_UNUSED_VAR_CHECK
+#define ATCA_UNUSED_VAR_CHECK   (DEFAULT_ENABLED)
 #endif
 
 /**** AES command ****/
@@ -653,6 +684,110 @@
  **/
 #ifndef ATCAB_WRITE_ENC_EN
 #define ATCAB_WRITE_ENC_EN                  ATCAB_WRITE_EN
+#endif
+
+/* Host side Cryptographic functionality required by the library */
+
+/** \def ATCAC_SHA1_EN
+ *
+ * Enable ATCAC_SHA1_EN to enable sha1 host side api
+ *
+ * Supported API's: atcab_write
+ **/
+#ifndef ATCAC_SHA1_EN
+#define ATCAC_SHA1_EN                       (DEFAULT_ENABLED)
+#endif
+
+/** \def ATCAC_SHA256_EN
+ *
+ * Enable ATCAC_SHA256_EN to enable sha256 host side api
+ *
+ **/
+#ifndef ATCAC_SHA256_EN
+#define ATCAC_SHA256_EN                     (FEATURE_ENABLED)
+#endif
+
+/** \def ATCAC_SHA384_EN
+ *
+ * Enable ATCAC_SHA384_EN to enable sha384 host side api
+ *
+ * Disabled by default. Enable ATCAC_SHA512_EN to use SHA384
+ **/
+#ifndef ATCAC_SHA384_EN
+#define ATCAC_SHA384_EN                     (FEATURE_DISABLED)
+#endif
+
+/** \def ATCAC_SHA512_EN
+ *
+ * Enable ATCAC_SHA512_EN to enable sha512 host side api
+ *
+ * Disabled by default. Use FEATURE_ENABLED to enable this feature
+ **/
+#ifndef ATCAC_SHA512_EN
+#define ATCAC_SHA512_EN                     (FEATURE_DISABLED)
+#endif
+
+/** \def ATCAC_SHA256_HMAC
+ *
+ * Requires: ATCAC_SHA256_HMAC
+ *           ATCAC_SW_SHA2_256
+ *
+ * Enable ATCAC_SHA256_HMAC to initialize context for performing HMAC (sha256) in software
+ *
+ * Supported API's: atcac_sha256_hmac_init, atcac_sha256_hmac_update, atcac_sha256_hmac_finish
+ **/
+#ifndef ATCAC_SHA256_HMAC_EN
+#define ATCAC_SHA256_HMAC_EN                ATCAC_SHA256_EN
+#endif
+
+/** \def ATCAC_SHA256_HMAC_COUNTER
+ *
+ * Requires: ATCAC_SHA256_HMAC_COUNTER
+ *           ATCAC_SHA256_HMAC
+ *           ATCAC_SW_SHA2_256
+ *
+ * Enable ATCAC_SHA256_HMAC_COUNTER to implement SHA256 HMAC-Counter per NIST SP 800-108 used for
+ * KDF like operations
+ *
+ * Supported API's: atcac_sha256_hmac_counter
+ **/
+#ifndef ATCAC_SHA256_HMAC_CTR_EN
+#define ATCAC_SHA256_HMAC_CTR_EN            ATCAC_SHA256_HMAC_EN
+#endif
+
+/** \def ATCAC_RANDOM_EN
+ *
+ * Requires: ATCA_HOSTLIB_EN
+ *
+ * Enable ATCAC_RANDOM_EN get random numbers from the host's
+ * implementation - generally assumed to come from the host's
+ * cryptographic library or peripheral driver
+ *
+ */
+#ifndef ATCAC_RANDOM_EN
+#define ATCAC_RANDOM_EN                     ATCA_HOSTLIB_EN
+#endif
+
+/** \def ATCAC_VERIFY_EN
+ *
+ * Requires: ATCA_HOSTLIB_EN
+ *
+ * Enable ATCAC_VERIFY_EN to use the host's verify functions. Generally assumed
+ * to come from the host's cryptographic library or peripheral driver.
+ */
+#ifndef ATCAC_VERIFY_EN
+#define ATCAC_VERIFY_EN                     ATCA_HOSTLIB_EN
+#endif
+
+/** \def ATCAC_SIGN_EN
+ *
+ * Requires: ATCA_HOSTLIB_EN
+ *
+ * Enable ATCAC_SIGN_EN to use the host's sign functions. Generally assumed
+ * to come from the host's cryptographic library or peripheral driver.
+ */
+#ifndef ATCAC_SIGN_EN
+#define ATCAC_SIGN_EN                       ATCA_HOSTLIB_EN
 #endif
 
 #endif /* ATCA_CONFIG_CHECK_H */

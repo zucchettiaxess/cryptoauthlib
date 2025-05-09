@@ -172,6 +172,7 @@ def get_device_type_id(name):
                 'ATECC608': 3,
                 'ATSHA206A': 4,
                 'TA100': 0x10,
+                'TA101': 0x11,
                 'ECC204': 0x20,
                 'TA010': 0x21,
                 'ECC206': 0x22,
@@ -699,6 +700,16 @@ class AtcaStructure(Structure):
             raise ValueError
         memmove(addressof(self), buffer, sizeof(self))
 
+class cal_buffer(Structure):
+    _fields_ = [
+        ('len', c_size_t),
+        ('buf', POINTER(c_uint8))
+    ]
+    _pack_ = 1
+
+    def __init__(self, length, data):
+        self.len = c_size_t(length)
+        self.buf = cast(bytes(data), POINTER(c_uint8))
 
 def ctypes_to_bytes(obj):
     """
@@ -721,4 +732,4 @@ def create_byte_buffer(init_or_size):
 
 
 __all__ = ['ATCA_NAMES', 'AtcaReference', 'load_cryptoauthlib', 'get_device_name', 'get_device_type_id',
-           'create_byte_buffer']
+           'create_byte_buffer', 'cal_buffer']

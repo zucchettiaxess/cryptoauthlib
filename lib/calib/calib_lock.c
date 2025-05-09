@@ -55,36 +55,47 @@
  */
 ATCA_STATUS calib_lock(ATCADevice device, uint8_t mode, uint16_t summary_crc)
 {
-    ATCAPacket packet;
-    ATCA_STATUS status = ATCA_GEN_FAIL;
-
-    if (device == NULL)
-    {
-        return ATCA_TRACE(ATCA_BAD_PARAM, "NULL pointer received");
-    }
-
-    // build command for lock zone and send
-    (void)memset(&packet, 0, sizeof(packet));
-    packet.param1 = mode;
-    packet.param2 = summary_crc;
+    ATCAPacket * packet = NULL;
+    ATCA_STATUS status;
 
     do
     {
-        if ((status = atLock(atcab_get_device_type_ext(device), &packet)) != ATCA_SUCCESS)
+#if ATCA_CHECK_PARAMS_EN
+        if (device == NULL)
+        {
+            status = ATCA_TRACE(ATCA_BAD_PARAM, "NULL pointer received");
+            break;
+        }
+#endif
+
+        packet = calib_packet_alloc();
+        if(NULL == packet)
+        {
+            (void)ATCA_TRACE(ATCA_ALLOC_FAILURE, "calib_packet_alloc - failed");
+            status = ATCA_ALLOC_FAILURE;
+            break;
+        }
+
+        // build command for lock zone and send
+        (void)memset(packet, 0, sizeof(ATCAPacket));
+        packet->param1 = mode;
+        packet->param2 = summary_crc;
+
+        if ((status = atLock(atcab_get_device_type_ext(device), packet)) != ATCA_SUCCESS)
         {
             (void)ATCA_TRACE(status, "atLock - failed");
             break;
         }
 
-        if ((status = atca_execute_command(&packet, device)) != ATCA_SUCCESS)
+        if ((status = atca_execute_command(packet, device)) != ATCA_SUCCESS)
         {
             (void)ATCA_TRACE(status, "calib_lock - execution failed");
             break;
         }
 
-    }
-    while (false);
+    } while (false);
 
+    calib_packet_free(packet);
     return status;
 }
 
@@ -218,6 +229,9 @@ ATCA_STATUS calib_lock_data_slot(ATCADevice device, uint16_t slot)
 #endif
     {
 #if CALIB_LOCK_EN
+        /* coverity[misra_c_2012_rule_10_1_violation:FALSE] The cast is safe because only the lower 8 bits are used after bitwise masking*/
+        /* coverity[misra_c_2012_rule_10_4_violation:FALSE] No loss of information due to the applied UINT8_MAX mask*/
+        /* coverity[misra_c_2012_rule_10_8_violation:FALSE] The final result is constrained to 8 bits using & UINT8_MAX*/
         status = calib_lock(device, (uint8_t)((LOCK_ZONE_DATA_SLOT | (slot << 2)) & UINT8_MAX), 0);
 #endif
     }
@@ -256,7 +270,7 @@ ATCA_STATUS calib_ca2_lock_config_slot(ATCADevice device, uint16_t slot, uint16_
  */
 ATCA_STATUS calib_ca2_lock_config_zone(ATCADevice device)
 {
-    ATCA_STATUS status = ATCA_GEN_FAIL;
+    ATCA_STATUS status;
     uint8_t slot = 0;
     uint8_t mode;
 
@@ -279,7 +293,7 @@ ATCA_STATUS calib_ca2_lock_config_zone(ATCADevice device)
             }
         }
 
-        slot += 1u;  //Increment slot
+        slot += 1u; //Increment slot
     }
 
     return status;
@@ -305,7 +319,7 @@ ATCA_STATUS calib_ca2_lock_data_slot(ATCADevice device, uint16_t slot)
  */
 ATCA_STATUS calib_ca2_lock_data_zone(ATCADevice device)
 {
-    ATCA_STATUS status = ATCA_GEN_FAIL;
+    ATCA_STATUS status;
     uint8_t slot = 0;
     uint8_t mode;
 
@@ -328,7 +342,7 @@ ATCA_STATUS calib_ca2_lock_data_zone(ATCADevice device)
             }
         }
 
-        slot += 1u;  //Increment slot
+        slot += 1u; //Increment slot
     }
 
     return status;

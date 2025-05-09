@@ -30,7 +30,10 @@
 #define ATCA_HAL_H_
 
 #include <stdlib.h>
+
+#ifndef LIBRARY_BUILD_EN
 #include "atca_config.h"
+#endif
 
 #include "atca_status.h"
 #include "atca_iface.h"
@@ -267,7 +270,7 @@ typedef DWORD hal_pid_t;
 ATCA_STATUS hal_check_pid(hal_pid_t pid);
 #endif
 
-#if !defined(ATCA_NO_HEAP) && defined(ATCA_TESTS_ENABLED)
+#if defined(ATCA_HEAP) && defined(ATCA_TESTS_ENABLED)
 void hal_test_set_memory_f(void* (*malloc_func)(size_t size), void (*free_func)(void* ptr));
 #endif
 

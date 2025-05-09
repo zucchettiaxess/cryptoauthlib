@@ -54,9 +54,35 @@
 #if defined(WOLF_CRYPT_SETTINGS_H) && defined(NO_SHA256)
 #define ATCAC_SHA256_EN                      (DEFAULT_DISABLED)
 #else
-#define ATCAC_SHA256_EN                      (DEFAULT_ENABLED)
+#define ATCAC_SHA256_EN                      (FEATURE_ENABLED)
 #endif
 #endif /* ATCAC_SHA256_EN */
+
+/** \def ATCAC_SHA384_EN
+ * Indicates if this module is a provider of a SHA384 implementation
+ *
+ * Disabled by default. Use FEATURE_ENABLED to use SHA384
+ */
+#ifndef ATCAC_SHA384_EN
+#if defined(WOLF_CRYPT_SETTINGS_H) && defined(NO_SHA512)
+#define ATCAC_SHA384_EN                      (DEFAULT_DISABLED)
+#else
+#define ATCAC_SHA384_EN                      (FEATURE_DISABLED)
+#endif
+#endif /* ATCAC_SHA384_EN */
+
+/** \def ATCAC_SHA512_EN
+ * Indicates if this module is a provider of a SHA512 implementation
+ *
+ * Disabled by default. Use FEATURE_ENABLED to use SHA512
+ */
+#ifndef ATCAC_SHA512_EN
+#if defined(WOLF_CRYPT_SETTINGS_H) && defined(NO_SHA512)
+#define ATCAC_SHA512_EN                      (DEFAULT_DISABLED)
+#else
+#define ATCAC_SHA512_EN                      (FEATURE_DISABLED)
+#endif
+#endif /* ATCAC_SHA512_EN */
 
 /** \def ATCAC_AES_CMAC_EN
  * Indicates if this module is a provider of an AES-CMAC implementation
@@ -80,13 +106,6 @@
 #endif
 #endif /* ATCAC_AES_GCM_EN */
 
-/** \def ATCAC_AES_GCM_UPDATE_EN
- * Indicates if this module is a provider of an AES-GCM Update implementation
- */
-#ifndef ATCAC_AES_GCM_UPDATE_EN
-#define ATCAC_AES_GCM_UPDATE_EN             (DEFAULT_DISABLED)
-#endif
-
 /** \def ATCAC_PKEY_EN
  * Indicates if this module is a provider of a generic asymmetric cryptography
  * implementation */
@@ -98,8 +117,13 @@
  * Indicates if this module is a provider of x509 certificate handling
  */
 #ifndef HOSTLIB_CERT_EN
-#define HOSTLIB_CERT_EN                     (DEFAULT_DISABLED)
+#define HOSTLIB_CERT_EN                     (DEFAULT_ENABLED)
 #endif
+
+typedef struct atcac_x509_ctx
+{
+    void* ptr;
+} atcac_x509_ctx_t;
 
 #endif /* ATCA_WOLFSSL */
 

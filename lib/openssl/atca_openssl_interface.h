@@ -47,8 +47,26 @@ extern "C" {
  * Indicates if this module is a provider of a SHA256 implementation
  */
 #ifndef ATCAC_SHA256_EN
-#define ATCAC_SHA256_EN                      (DEFAULT_ENABLED)
+#define ATCAC_SHA256_EN                      (FEATURE_ENABLED)
 #endif /* ATCAC_SHA256_EN */
+
+/** \def ATCAC_SHA384_EN
+ * Indicates if this module is a provider of a SHA384 implementation
+ *
+ * Disabled by default. Use FEATURE_ENABLED to use SHA384
+ */
+#ifndef ATCAC_SHA384_EN
+#define ATCAC_SHA384_EN                      (FEATURE_DISABLED)
+#endif /* ATCAC_SHA384_EN */
+
+/** \def ATCAC_SHA512_EN
+ * Indicates if this module is a provider of a SHA512 implementation
+ *
+ * Disabled by default. Use FEATURE_ENABLED to use SHA512
+ */
+#ifndef ATCAC_SHA512_EN
+#define ATCAC_SHA512_EN                      (FEATURE_DISABLED)
+#endif /* ATCAC_SHA512_EN */
 
 /** \def ATCAC_AES_CMAC_EN
  * Indicates if this module is a provider of an AES-CMAC implementation
@@ -64,13 +82,6 @@ extern "C" {
 #define ATCAC_AES_GCM_EN                    (DEFAULT_ENABLED)
 #endif /* ATCAC_AES_GCM_EN */
 
-/** \def ATCAC_AES_GCM_UPDATE_EN
- * Indicates if this module is a provider of an AES-GCM Update implementation
- */
-#ifndef ATCAC_AES_GCM_UPDATE_EN
-#define ATCAC_AES_GCM_UPDATE_EN             (ATCAC_AES_GCM_EN)
-#endif
-
 /** \def ATCAC_PKEY_EN
  * Indicates if this module is a provider of a generic asymmetric cryptography
  * implementation */
@@ -82,10 +93,10 @@ extern "C" {
  * Indicates if this module is a provider of x509 certificate handling
  */
 #ifndef HOSTLIB_CERT_EN
-#define HOSTLIB_CERT_EN                     (DEFAULT_DISABLED)
+#define HOSTLIB_CERT_EN                     (DEFAULT_ENABLED)
 #endif
 
-#if ATCAC_AES_GCM_EN || ATCAC_AES_GCM_UPDATE_EN
+#if ATCAC_AES_GCM_EN
 typedef struct atcac_aes_gcm_ctx
 {
     void* ptr;
@@ -102,6 +113,16 @@ typedef struct atcac_sha2_256_ctx
     void* ptr;
 } atcac_sha2_256_ctx_t;
 
+typedef struct atcac_sha2_384_ctx
+{
+    void* ptr;
+} atcac_sha2_384_ctx_t;
+
+typedef struct atcac_sha2_512_ctx
+{
+    void* ptr;
+} atcac_sha2_512_ctx_t;
+
 typedef struct atcac_aes_cmac_ctx
 {
     void* ptr;
@@ -116,6 +137,11 @@ typedef struct atcac_pk_ctx
 {
     void* ptr;
 } atcac_pk_ctx_t;
+
+typedef struct atcac_x509_ctx
+{
+    void* ptr;
+} atcac_x509_ctx_t;
 
 #ifdef __cplusplus
 }

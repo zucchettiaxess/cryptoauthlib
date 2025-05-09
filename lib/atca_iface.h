@@ -43,10 +43,12 @@ extern "C" {
 #include <stdint.h>
 #include <stddef.h>
 
-#include "atca_config.h"
 #include "atca_devtypes.h"
 #include "atca_status.h"
 
+#ifndef LIBRARY_BUILD_EN
+#include "atca_config.h"
+#endif
 
 #ifdef ATCA_STRICT_C99
 #define ATCA_IFACECFG_NAME(x)  (x)
@@ -208,9 +210,11 @@ typedef struct atca_iface
 
 ATCA_STATUS initATCAIface(ATCAIfaceCfg *cfg, ATCAIface ca_iface);
 ATCA_STATUS releaseATCAIface(ATCAIface ca_iface);
+#ifdef ATCA_HEAP
 void deleteATCAIface(ATCAIface *ca_iface);
+#endif
 
-#if !defined(ATCA_NO_HEAP) && defined(ENABLE_NEWATCAIFACE)
+#if defined(ATCA_HEAP) && defined(ENABLE_NEWATCAIFACE)
 ATCAIface newATCAIface(ATCAIfaceCfg *cfg);
 #endif
 

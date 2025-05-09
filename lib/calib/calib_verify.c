@@ -68,12 +68,15 @@
  *
  * \return ATCA_SUCCESS on success, otherwise an error code.
  */
-ATCA_STATUS calib_verify(ATCADevice device, uint8_t mode, uint16_t key_id, const uint8_t* signature, const uint8_t* public_key, const uint8_t* other_data, uint8_t* mac)
+ATCA_STATUS calib_verify(ATCADevice device, uint8_t mode, uint16_t key_id, const uint8_t* signature, const uint8_t* public_key, const uint8_t* other_data,
+                         uint8_t* mac)
 {
-    ATCAPacket packet;
-    ATCA_STATUS status = ATCA_GEN_FAIL;
+    ATCAPacket * packet = NULL;
+    ATCA_STATUS status;
+
     uint8_t verify_mode = (mode & VERIFY_MODE_MASK);
 
+    
     do
     {
         if ((device == NULL) || (verify_mode == VERIFY_MODE_EXTERNAL && public_key == NULL) ||
@@ -109,41 +112,51 @@ ATCA_STATUS calib_verify(ATCADevice device, uint8_t mode, uint16_t key_id, const
         }
         #endif
 
+        packet = calib_packet_alloc();
+        if(NULL == packet)
+        {
+            (void)ATCA_TRACE(ATCA_ALLOC_FAILURE, "calib_packet_alloc - failed");
+            status = ATCA_ALLOC_FAILURE;
+            break;
+        }
+
+        (void)memset(packet, 0x00, sizeof(ATCAPacket));
+
         // Build the verify command
-        packet.param1 = mode;
-        packet.param2 = key_id;
-        (void)memcpy(&packet.data[0], signature, ATCA_SIG_SIZE);
+        packet->param1 = mode;
+        packet->param2 = key_id;
+        (void)memcpy(&packet->data[0], signature, ATCA_SIG_SIZE);
         if (verify_mode == VERIFY_MODE_EXTERNAL)
         {
-            (void)memcpy(&packet.data[ATCA_SIG_SIZE], public_key, ATCA_PUB_KEY_SIZE);
+            (void)memcpy(&packet->data[ATCA_SIG_SIZE], public_key, ATCA_PUB_KEY_SIZE);
         }
 
         if ((verify_mode == VERIFY_MODE_VALIDATE) || (verify_mode == VERIFY_MODE_INVALIDATE))
         {
-            (void)memcpy(&packet.data[ATCA_SIG_SIZE], other_data, VERIFY_OTHER_DATA_SIZE);
+            (void)memcpy(&packet->data[ATCA_SIG_SIZE], other_data, VERIFY_OTHER_DATA_SIZE);
         }
 
-        if ((status = atVerify(atcab_get_device_type_ext(device), &packet)) != ATCA_SUCCESS)
+        if ((status = atVerify(atcab_get_device_type_ext(device), packet)) != ATCA_SUCCESS)
         {
             (void)ATCA_TRACE(status, "atVerify - failed");
             break;
         }
 
-        if ((status = atca_execute_command(&packet, device)) != ATCA_SUCCESS)
+        if ((status = atca_execute_command(packet, device)) != ATCA_SUCCESS)
         {
             (void)ATCA_TRACE(status, "calib_verify - execution failed");
             break;
         }
 
         // The Verify command may return MAC if requested
-        if ((mac != NULL) && (packet.data[ATCA_COUNT_IDX] >= (ATCA_PACKET_OVERHEAD + MAC_SIZE)))
+        if ((mac != NULL) && (packet->data[ATCA_COUNT_IDX] >= (ATCA_PACKET_OVERHEAD + MAC_SIZE)))
         {
-            (void)memcpy(mac, &packet.data[ATCA_RSP_DATA_IDX], MAC_SIZE);
+            (void)memcpy(mac, &packet->data[ATCA_RSP_DATA_IDX], MAC_SIZE);
         }
 
-    }
-    while (false);
+    } while (false);
 
+    calib_packet_free(packet);
     return status;
 }
 #endif /* CALIB_VERIFY */
@@ -178,9 +191,10 @@ ATCA_STATUS calib_verify(ATCADevice device, uint8_t mode, uint16_t key_id, const
  * \return ATCA_SUCCESS on verification success or failure, because the
  *         command still completed successfully.
  */
-static ATCA_STATUS calib_verify_extern_stored_mac(ATCADevice device, uint8_t mode, uint16_t key_id, const uint8_t* message, const uint8_t* signature, const uint8_t* public_key, const uint8_t* num_in, const uint8_t* io_key, bool* is_verified)
+static ATCA_STATUS calib_verify_extern_stored_mac(ATCADevice device, uint8_t mode, uint16_t key_id, const uint8_t* message, const uint8_t* signature,
+                                                  const uint8_t* public_key, const uint8_t* num_in, const uint8_t* io_key, bool* is_verified)
 {
-    ATCA_STATUS status = ATCA_GEN_FAIL;
+    ATCA_STATUS status;
     uint8_t msg_dig_buf[64];
     atca_verify_mac_in_out_t verify_mac_params;
     uint8_t mac[SECUREBOOT_MAC_SIZE];
@@ -232,8 +246,7 @@ static ATCA_STATUS calib_verify_extern_stored_mac(ATCADevice device, uint8_t mod
         }
 
         *is_verified = (memcmp(host_mac, mac, MAC_SIZE) == 0);
-    }
-    while (false);
+    } while (false);
 
     return status;
 }
@@ -260,7 +273,8 @@ static ATCA_STATUS calib_verify_extern_stored_mac(ATCADevice device, uint8_t mod
  * \return ATCA_SUCCESS on verification success or failure, because the
  *         command still completed successfully.
  */
-ATCA_STATUS calib_verify_extern_mac(ATCADevice device, const uint8_t *message, const uint8_t* signature, const uint8_t* public_key, const uint8_t* num_in, const uint8_t* io_key, bool* is_verified)
+ATCA_STATUS calib_verify_extern_mac(ATCADevice device, const uint8_t *message, const uint8_t* signature, const uint8_t* public_key, const uint8_t* num_in,
+                                    const uint8_t* io_key, bool* is_verified)
 {
     return calib_verify_extern_stored_mac(device, VERIFY_MODE_EXTERNAL, VERIFY_KEY_P256, message, signature, public_key, num_in, io_key, is_verified);
 }
@@ -285,7 +299,8 @@ ATCA_STATUS calib_verify_extern_mac(ATCADevice device, const uint8_t *message, c
  * \return ATCA_SUCCESS on verification success or failure, because the
  *         command still completed successfully.
  */
-ATCA_STATUS calib_verify_stored_mac(ATCADevice device, const uint8_t *message, const uint8_t *signature, uint16_t key_id, const uint8_t* num_in, const uint8_t* io_key, bool* is_verified)
+ATCA_STATUS calib_verify_stored_mac(ATCADevice device, const uint8_t *message, const uint8_t *signature, uint16_t key_id, const uint8_t* num_in,
+                                    const uint8_t* io_key, bool* is_verified)
 {
     return calib_verify_extern_stored_mac(device, VERIFY_MODE_STORED, key_id, message, signature, NULL, num_in, io_key, is_verified);
 }
@@ -315,7 +330,7 @@ ATCA_STATUS calib_verify_stored_mac(ATCADevice device, const uint8_t *message, c
 #if CALIB_VERIFY_EXTERN_EN
 ATCA_STATUS calib_verify_extern(ATCADevice device, const uint8_t *message, const uint8_t *signature, const uint8_t *public_key, bool *is_verified)
 {
-    ATCA_STATUS status = ATCA_GEN_FAIL;
+    ATCA_STATUS status;
     uint8_t nonce_target = NONCE_MODE_TARGET_TEMPKEY;
     uint8_t verify_source = VERIFY_MODE_SOURCE_TEMPKEY;
 
@@ -349,8 +364,7 @@ ATCA_STATUS calib_verify_extern(ATCADevice device, const uint8_t *message, const
         {
             status = ATCA_SUCCESS;  // Verify failed, but command succeeded
         }
-    }
-    while (false);
+    } while (false);
 
     return status;
 }
@@ -377,7 +391,7 @@ ATCA_STATUS calib_verify_extern(ATCADevice device, const uint8_t *message, const
  */
 ATCA_STATUS calib_verify_stored(ATCADevice device, const uint8_t *message, const uint8_t *signature, uint16_t key_id, bool *is_verified)
 {
-    ATCA_STATUS status = ATCA_GEN_FAIL;
+    ATCA_STATUS status;
     uint8_t nonce_target = NONCE_MODE_TARGET_TEMPKEY;
     uint8_t verify_source = VERIFY_MODE_SOURCE_TEMPKEY;
 
@@ -410,8 +424,7 @@ ATCA_STATUS calib_verify_stored(ATCADevice device, const uint8_t *message, const
         {
             status = ATCA_SUCCESS;  // Verify failed, but command succeeded
         }
-    }
-    while (false);
+    } while (false);
 
     return status;
 }
@@ -437,7 +450,7 @@ ATCA_STATUS calib_verify_stored(ATCADevice device, const uint8_t *message, const
  */
 ATCA_STATUS calib_verify_stored_with_tempkey(ATCADevice device, const uint8_t* signature, uint16_t key_id, bool* is_verified)
 {
-    ATCA_STATUS status = ATCA_GEN_FAIL;
+    ATCA_STATUS status;
     uint8_t verify_source = VERIFY_MODE_SOURCE_TEMPKEY;
 
     if ((device == NULL) || (is_verified == NULL) || (signature == NULL))
@@ -456,8 +469,7 @@ ATCA_STATUS calib_verify_stored_with_tempkey(ATCADevice device, const uint8_t* s
         {
             status = ATCA_SUCCESS;  // Verify failed, but command succeeded
         }
-    }
-    while (false);
+    } while (false);
 
     return status;
 }

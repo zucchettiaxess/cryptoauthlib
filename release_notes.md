@@ -1,6 +1,161 @@
 
 # Microchip Cryptoauthlib Release Notes
 
+## Release v3.7.8 (05/05/2025)
+
+### Fixes
+  - Updated minimum required version of CMake to v3.20 to support its new features and improvements
+  - Resolved tng_atcacert_read_signer_cert build failure when using MPLAB Harmony projects
+  - Fixed tng_atcacert_max_device_cert_size function to prevent overwriting max_cert_size
+  - Addressed the dependency issue where SHA512 is required for SHA384 in the SW Crypto module
+  - Fixed an issue in the Linux environment where the SPI file descriptor was inadvertently closed twice 
+  - Incorporated additional ATCA_CHECK_PARAMS_EN checks in sections of the code where they were previously absent
+  - Eliminated all compiler warnings in MPLAB Melody related to the atcacert module
+  - Eliminated all compiler warnings in MPLAB Harmony projects when adding the CAL library 
+    as a project component
+  - Addressed all MISRA violations categorized as "Required" in MPLAB Harmony. 
+    Note that "Advisory" issues remain unaddressed
+  - Resolved build issues in the PyCAL library to ensure its compatibility CAL library counterpart in C
+  - Resolved build errors on arm64 MacOS platforms when utilizing the USB library for hidapi; kick-start
+    transition to libusb-maintained version of hidapi, moving away from the previous signal11 repository
+  - Addressed incorrect header file inclusions in atca_mbedtls_wrap.h related to the ATCA_MBEDTLS configuration
+  - PKCS11 layer fixes/updates
+    - Corrected return value in C_FindObjectsInit API to no longer return CKR_OK when no objects are found
+    - Fixed an issue causing certificate export failures when using ATECCC608 TNGTLS devices
+    - Resolved a race condition that occurred during the creation of a mutex
+
+## Release v3.7.7 (02/07/2025)
+
+### New Features
+  - Extended atcacert module to support compressed certificate usage for TA devices
+  - Enhanced WPC application to support TA devices
+  - Updated PKCS#11 and Openssl wiki documentation to include steps for using Openssl 3.0+ versions
+  - Updated PKCS#11 module to add compatibility for higher SHA-2 (SHA384 and SHA512) functions
+  - Added NIST vector tests to cover AES CCM module validation
+  - Modified calib packet allocation to use memory from either heap or data segment based on user configuration
+    instead of always using data segment.
+
+### Fixes
+  - Resolved SWI 1-wire communication failure occuring in hal_swi_gpio while using MPLABx Harmony projects
+    - delay routines in hal_cortex_m_delay are optimized to generate accurate delays for SAM cortex-m device family
+    - removed call stack overhead in hal_swi_gpio to meet required SWI bit timing
+  - Minimum required version for CMake is changed from 3.0.1 to 3.10.0
+  - Fixed compilation issues with atcac_get_subj_public_key when WolfSSL configuration is enabled
+
+### API CHANGES
+  - Replaced I/O buffers in atcacert with cal_buffer at few instances to support resource-constrained PIC18 devices
+    - Refer [lib/atcacert/MIGRATION.md] for details on atcacert API changes
+
+## Release v3.7.6 (09/26/2024)
+
+### New Features
+  - In PKCS11 module, added support for RSA key types, certificates and algorithms
+  - Added SHA384 and SHA512 support for host side software crypto (lib/crypto/) operations
+  - Modified WPC application to support ECC204 and TA010 devices
+  - See [talib/CHANGES.md] for details on talib module changes
+
+### Fixes
+  - Shared library build (libcryptoauth.so) sets ABI version number (libcryptoauth.so.x)
+  - Fixed atcacert_read_cert() API failure when certificate elements read from config zone
+    for ECC204 and TA010 devices
+  - Resolved kit protocol compilation failure for PIC18 device (XC8) builds
+  - PKCS11 layer fixes/updates
+    - Fixed C_DestroyObject failure when deleting a key pair
+    - Fixed C_DeriveKey API usage sequence
+
+## Release v3.7.5 (06/26/2024)
+
+### New Features
+  - In PKCS11 module, added ECCP384,ECCP521,ECCP224 elliptic curves support for
+    ECC key operations, in addition to the existing ECCP256 support
+  - Enhanced certificate related tests to include coverage for ECC204 and TA010 devices
+  - Added a new ATCA_HEAP internal macro check in place of ATCA_NO_HEAP for dynamic memory usages
+  - Added an additional test to validate AES-CBC encrypt/decrypt APIs using
+    CAVP's AES multiblock message test (MMT) sample vectors
+  - See [talib/CHANGES.md] for details on talib module changes
+
+### Fixes
+  - Fixed atcacert_get_comp_cert() API to support certificates with expiry dates beyond year 2031
+  - Fixed atcacert_read_cert() API to consider serial number as source while processing
+    extracted certificates
+  - Fixed atcacert_write_cert() API to support X509 certificates with an odd byte length,
+    without any additional padding
+  - Fixed calib_execute_send() to consider correct data buffer when ATCA_HAL_LEGACY_API is used
+  - PKCS11 layer fixes/updates
+    - Fixed certificate chain/key export failures in ECC608 Trust devices
+  	- Fixed memory leak during C_Finalize API call usage in a multi-slot configuration
+
+### API Changes
+  - Added atcacert_generate_sn() API in atcacert module to generate certificate serial number
+    from a valid serial number source
+
+## Release v3.7.4 (03/08/2024)
+
+### New Features
+  - Updated wolfSSL interface `atcac` wrapper APIs usage for AES GCM encrypt/decrypt
+    similar to MbedTLS and openSSL library wrapper APIs
+  - Added package.yml file to support MPLAB Harmony metadata package format
+
+### Fixes
+  - Fixed calib_wakeup_i2c API to follow specified i2c wakeup sequence for ECC608 devices
+  - PKCS11 layer fixes/updates
+    - Lock usage optimization in pkcs11_find_continue API
+    - pkcs11_digest API updates for SHA context memory allocation
+    - pkcs11_token_set_pin API updates to write data based on generated GCM key size
+  - Fixed atcacert_get_comp_cert API to remove a redundant atcacert_date_enc_compcert call
+  - Resolved build warnings/issues in Windows, Linux and 8-bit (XC8) platforms
+  - wolfSSL's atcac_pk_init_pem wrapper API updates to use wc_ PEM to DER functions
+  - Fixed broken links in README.md files
+
+## Release v3.7.3 (01/31/2024)
+
+### New Features
+  - In PKCS11 module, added cache support to store `Key id` attribute of
+    key type objects into stack memory and use it for subsequent accesses
+
+### Fixes
+  - Fixed calib_sha_hmac_finish api to set mode value correctly for
+    ECC204, TA010 and ECC608 devices
+  - Fixed memory leak in MbedTLS configuration
+  - Fixed build errors when a project is generated with PKCS11 Component enabled in
+    MPLAB Harmony Configurator (MHC)
+
+## Release v3.7.2 (01/19/2024)
+
+### New Features
+  - See [talib/CHANGES.md] for details on talib module changes
+
+### Fixes
+  - Updated PKCS11 token info to list TA101 device details
+  - Fixed compilation errors when ECC508 device is enabled
+  - See [talib/CHANGES.md] for details on talib module fixes
+
+### API Changes
+  - Added sign and verfy API in talib module to support `1024 bytes ED25519 mode`
+
+## Release v3.7.1 (12/15/2023)
+
+### New Features
+  - PKCS11 module enhancements for x509 public key certificates
+    - Added more certificate attributes to x509 public key certificates.
+      These attributes include certificate start date, certificate end date, subject,
+      subject key, DER encoded certificate issuer name, DER encoded certificate
+      serial number and hash of the issuer public key.
+    - Added cache support to store these certificates into stack memory and utilize
+      it for parsing the above specified certificate attributes.
+  - See [talib/CHANGES.md] for details on talib module changes
+
+### Fixes
+  - Updated atcab_read_config_zone to support SHA106
+  - For Linux platforms, i2c baud rate is always set to 100 khz as the default configuration
+  - Resolved build errors when ATCA_USE_SHARED_MUTEX is disabled
+  - Resolved build error with ATCA_JWT_EN
+
+### API Changes
+  - Added atcacert_get_subject api to get the subject name from public x509 certificates
+  - Added atcacert_get_issuer api to get the issuer name from public x509 certificates
+  - Updated the atcacert_def_s structure to include x509 full certificates support
+
 ## Release v3.7.0 (09/08/2023)
 
 ### New Features
@@ -14,18 +169,18 @@
     party headers.
 
 ### API Changes
-  - The software crypto structures are generally no longer typedef'd so they must be 
-    declared with the `struct` keyword. New typedefs were added by appending the 
+  - The software crypto structures are generally no longer typedef'd so they must be
+    declared with the `struct` keyword. New typedefs were added by appending the
     suffix `_t` which allows for the same mechanism for declaring these structure in code
-    if building a standalone application (such as in embedded projects). If dynamically 
-    linking with the library and using a third party crypto library one will need to use 
-    the `_new` & `_free` APIs to allocate these structures for use with the `atcac` 
+    if building a standalone application (such as in embedded projects). If dynamically
+    linking with the library and using a third party crypto library one will need to use
+    the `_new` & `_free` APIs to allocate these structures for use with the `atcac`
     interfaces.
 
 ## Release v3.6.1 (07/14/2023)
 
 ### New Features
-  - Added support for PIC18 memory model with a MAX_PACKET_SIZE setting. 
+  - Added support for PIC18 memory model with a MAX_PACKET_SIZE setting.
   - PKCS11 Improvement to support context reservation automatically for operations that
     span multiple pkcs11 calls such as login/logout, encrypt/decrypt, etc. This prevents
     concurrent processes from interupting init-update-finish operations in PKCS11
@@ -48,7 +203,7 @@
     in the given auth session
 
 ### Fixes
-  - pkcs11 public key for private keys requiring the token to be logged in will make a 
+  - pkcs11 public key for private keys requiring the token to be logged in will make a
     best effort to return a value by detecting various storage methods.
   - pkcs11 encrypt/decrypt update calls return the maximum possible bytes per the selected
     algorithm.
@@ -103,15 +258,15 @@
     key, and finally return data unavailable). For the vast majority of situtations this
     prevents openssl & libp11 from crashing with segmentation faults if the user fails to
     provide a pkcs11 URI with pin value specified. These segmentation faults were confirmed
-    to also exist with other PKCS11 libraries - the fundamental problem should be taken up 
-    with the maintainers of openssl, libp11, and pkcs11-provider (experimental OpenSSL 
-    3.0 PKCS11 support). 
+    to also exist with other PKCS11 libraries - the fundamental problem should be taken up
+    with the maintainers of openssl, libp11, and pkcs11-provider (experimental OpenSSL
+    3.0 PKCS11 support).
   - Modified CBC update/finish APIs (added as an experimental API in v3.4.0) to match
     standard expectations of how the APIs would function. Updated algorithm tests
     to reflect this usage.
   - PKCS11: Updated encrypt/decrypt in cbc/cbcpad modes to use the updated algorithm
     implementations
-  - talib full element read & write functions now account for the maximum packet size 
+  - talib full element read & write functions now account for the maximum packet size
     based on session state.
 
 
@@ -174,7 +329,7 @@
   - Several pkcs11 fixes - token_init deadlock, null num_in for private key writes,
     fsecret key length parsing, object_create failing, etc
   - Null pointer access violation in atcab_release when using a native hal and double
-    free in openssl implementation of atcac_pk_verify 
+    free in openssl implementation of atcac_pk_verify
 
 
 ## Release v3.3.2 (06/20/2021)
@@ -223,7 +378,7 @@
   - Fix for I2C errors that could be created on the bus when there are devices
     on the bus that support general calls - this fix should also correct
     linux zero length kernel messages when enabled.
-  - Fix ESP32 HAL to work with the updated HAL structure. 
+  - Fix ESP32 HAL to work with the updated HAL structure.
 
 ## Release v3.3.0 (01/22/2021)
 
@@ -255,7 +410,7 @@
 ## Release v3.2.5 (11/30/2020)
 
 ### New features
-  - TA100 ShareKey API to drive the sharekey process (requires NDA, consult 
+  - TA100 ShareKey API to drive the sharekey process (requires NDA, consult
     with your FAE or submit a request through your myMicrochip account)
   - Additional software crypto library interface functions for asymmetric
     cryptography (sign, verify, ecdh, etc)
@@ -271,7 +426,7 @@
 ## Release v3.2.4 (10/17/2020)
 
 ### New features
-  - Additional TA100 command support (requires NDA, consult with your FAE or 
+  - Additional TA100 command support (requires NDA, consult with your FAE or
     submit a request through your myMicrochip account)
   - Library build and install on linux now also installs the headers that
     were used to build the library including all configuration files like
@@ -288,7 +443,7 @@
 ## Release v3.2.3 (09/12/2020)
 
 ### New features
-  - Additional TA100 command support (requires NDA, consult with your FAE or 
+  - Additional TA100 command support (requires NDA, consult with your FAE or
     submit a request through your myMicrochip account)
 
 ### Fixes
@@ -361,7 +516,7 @@
     of the library such as import/export, transfer, and devupdate.
 
 ## Release v3.1.1 (03/06/2020)
-  - Update Trust Flex certificates. Add compile time options to reduce code 
+  - Update Trust Flex certificates. Add compile time options to reduce code
     space by selectively including the trust certificates that are required
   - Python updates: add sha206 apis. Fix atcab_kdf parameters
   - Fix compiler warnings in test application files and sha206 api
@@ -372,7 +527,7 @@
     been updated.
   - Configuration is done via a configuration file atca_config.h rather than
     global compiler options. You have to add this file to your project to support
-    this version of the library. 
+    this version of the library.
   - Harmony 3 support has been added. Update harmony configurator (and content
     loader) or manually clone crytoauthlib into your harmony directory.
   - Additional Compiler support has been added for IAR-ARM and ARMCC
@@ -386,7 +541,7 @@
   - Added Azure compatible TNGTLS and TNGLORA certificates. Use the TNG client
     API to retrieve the proper certificate based on the device.
   - Misc Python updates (updated APIs for encrypted reads to match the C-API change)
-    atcacert_cert_element_t now initializes properly 
+    atcacert_cert_element_t now initializes properly
 
 ## Release 08/30/2019
   - Added big-endian architecture support
@@ -417,7 +572,7 @@
   - Added AES-CTR mode functions.
   - Python wrapper functions now return single values with AtcaReference.
   - Added mutex support to HAL and better support for freeRTOS.
-  
+
 ## Release 08/17/2018
   - Better support for multiple kit protocol devices
 
@@ -443,10 +598,10 @@
 ## Release 01/15/2018
   - Added AES-128 CBC implementation using AES command
   - Added AES-128 CMAC implementation using AES command
-  
+
 ## Release 11/22/2017
   - Added support for FLEXCOM6 on SAMG55 driver
-  
+
 ## Release 11/17/2017
   - Added library support for the ATECC608A device
   - Added support for Counter command
@@ -495,7 +650,7 @@
   - Fixed some edge cases in atcab_read_bytes_zone().
   - Updated atSHA() to work with all devices.
   - Fixed atcacert_get_device_locs() when using stored sn.
-  
+
 ## Release 01/08/2016
   - New HAL implementations for
     - Single Wire interface for SAMD21 / SAMR21
@@ -503,13 +658,13 @@
     - XMega A3Bu HAL implementation
   - Added atcab_version() method to return current version string of libary to
     application
-  - New Bus and Discovery API 
+  - New Bus and Discovery API
     - returns a list of ATCA device configurations for each CryptoAuth device
       found
     - currently implemented on SAMD21/R21 I2C, SAMV71
     - additional discovery implementations to come
   - TLS APIs solidified and documented
-  - Added missing doxygen documentation for some CryptoAuthLib methods 
+  - Added missing doxygen documentation for some CryptoAuthLib methods
   - Stubs for HAL SPI removed as they are unused for SHA204A and ECC508A
     support
   - bug fixes
@@ -523,7 +678,7 @@
   - Kit protocol over HID on Windows
   - Kit protocol over CDC on Linux
   - TLS integration with ATECC508A
-  - Certificate I/O and reconstruction 
+  - Certificate I/O and reconstruction
   - New SHA2 implementation
   - Major update to API docs, Doxygen files found in cryptoauthlib/docs
   - load cryptoauthlib/docs/index.html with your browser

@@ -60,6 +60,9 @@ selected plus however additional slots one would like */
 /** Enable preprocessor warning messages */
 #cmakedefine01 ATCA_PREPROCESSOR_WARNING
 
+/** Enable check params */
+#cmakedefine01 ATCA_CHECK_PARAMS_EN
+
 /** Enable jwt functionality */
 #cmakedefine ATCA_JWT_EN
 
@@ -73,6 +76,13 @@ selected plus however additional slots one would like */
 #cmakedefine ATCA_TNGLORA_SUPPORT
 #cmakedefine ATCA_TFLEX_SUPPORT
 #cmakedefine ATCA_TNG_LEGACY_SUPPORT
+
+/** Define WPC to be supported. */
+#cmakedefine ATCA_WPC_SUPPORT
+
+/** Define SHA options to be supported. */
+#cmakedefine01 ATCAC_SHA384_EN
+#cmakedefine01 ATCAC_SHA512_EN
 
 /** Define Software Crypto Library to Use - if none are defined use the
     cryptoauthlib version where applicable */
@@ -99,6 +109,13 @@ selected plus however additional slots one would like */
 /** Enable Strict ISO/C99 compliance */
 #cmakedefine ATCA_STRICT_C99
 
+/** Atcacert module configurations */
+#cmakedefine01 ATCACERT_COMPCERT_EN
+#cmakedefine01 ATCACERT_FULLSTOREDCERT_EN 
+
+/** Enable ATCACERT Full Certificate Integration */
+#cmakedefine01 ATCACERT_INTEGRATION_EN
+
 /******************** Device Configuration Section *************************/
 
 /** Enable the delete command */
@@ -107,10 +124,9 @@ selected plus however additional slots one would like */
 /******************** Packet Size Configuration Section *************************/
 
 /** Provide Maximum packet size for the command to be sent and received */
-#ifndef MAX_PACKET_SIZE
-#define MAX_PACKET_SIZE         (@MAX_PACKET_SIZE@U)
-#endif
+#cmakedefine MAX_PACKET_SIZE      (@MAX_PACKET_SIZE@U)
 
+/** Enables multipart buffer handling (generally for small memory model platforms) */
 #cmakedefine01 MULTIPART_BUF_EN
 
 /******************** Platform Configuration Section ***********************/

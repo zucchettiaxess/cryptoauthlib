@@ -27,6 +27,10 @@
 #include "cryptoauthlib.h"
 #include "crypto/atca_crypto_sw.h"
 
+#ifdef __COVERITY__
+#pragma coverity compliance block deviate "MISRA C-2012 Rule 11.3" "Third party library (openssl) implementation requires pointer type casting"
+#endif
+
 #ifdef ATCA_OPENSSL
 #include <openssl/bn.h>
 #include <openssl/bio.h>
@@ -36,6 +40,8 @@
 #include <openssl/hmac.h>
 #include <openssl/pem.h>
 #include <openssl/rand.h>
+#include <openssl/x509.h>
+#include <openssl/x509v3.h>
 
 typedef struct
 {
@@ -432,6 +438,7 @@ ATCA_STATUS atcac_sw_sha1_finish(
     return atca_openssl_md_finish((atca_evp_ctx*)ctx, digest, &outlen);
 }
 
+#if ATCAC_SHA256_EN
 /** \brief Initialize context for performing SHA256 hash in software.
  *
  * \return ATCA_SUCCESS on success, otherwise an error code.
@@ -469,6 +476,87 @@ ATCA_STATUS atcac_sw_sha2_256_finish(
 
     return atca_openssl_md_finish((atca_evp_ctx*)ctx, digest, &outlen);
 }
+#endif /* ATCAC_SHA256_EN */
+
+#if ATCAC_SHA384_EN
+/** \brief Initialize context for performing SHA384 hash in software.
+ *
+ * \return ATCA_SUCCESS on success, otherwise an error code.
+ */
+ATCA_STATUS atcac_sw_sha2_384_init(
+    struct atcac_sha2_384_ctx* ctx  /**< [in] pointer to a hash context */
+    )
+{
+    return atca_openssl_md_init((atca_evp_ctx*)ctx, EVP_sha384());
+}
+
+/** \brief Add data to a SHA384 hash.
+ *
+ * \return ATCA_SUCCESS on success, otherwise an error code.
+ */
+ATCA_STATUS atcac_sw_sha2_384_update(
+    struct atcac_sha2_384_ctx* ctx,      /**< [in] pointer to a hash context */
+    const uint8_t*             data,     /**< [in] input data buffer */
+    size_t                     data_size /**< [in] input data length */
+    )
+{
+    return atca_openssl_md_update((atca_evp_ctx*)ctx, data, data_size);
+}
+
+/** \brief Complete the SHA384 hash in software and return the digest.
+ *
+ * \return ATCA_SUCCESS on success, otherwise an error code.
+ */
+ATCA_STATUS atcac_sw_sha2_384_finish(
+    struct atcac_sha2_384_ctx* ctx,                              /**< [in] pointer to a hash context */
+    uint8_t                    digest[ATCA_SHA2_384_DIGEST_SIZE] /**< [out] output buffer (48 bytes) */
+    )
+{
+    unsigned int outlen = ATCA_SHA2_384_DIGEST_SIZE;
+
+    return atca_openssl_md_finish((atca_evp_ctx*)ctx, digest, &outlen);
+}
+#endif /* ATCAC_SHA384_EN */
+
+#if ATCAC_SHA512_EN
+/** \brief Initialize context for performing SHA512 hash in software.
+ *
+ * \return ATCA_SUCCESS on success, otherwise an error code.
+ */
+ATCA_STATUS atcac_sw_sha2_512_init(
+    struct atcac_sha2_512_ctx* ctx  /**< [in] pointer to a hash context */
+    )
+{
+    return atca_openssl_md_init((atca_evp_ctx*)ctx, EVP_sha512());
+}
+
+/** \brief Add data to a SHA512 hash.
+ *
+ * \return ATCA_SUCCESS on success, otherwise an error code.
+ */
+ATCA_STATUS atcac_sw_sha2_512_update(
+    struct atcac_sha2_512_ctx* ctx,      /**< [in] pointer to a hash context */
+    const uint8_t*             data,     /**< [in] input data buffer */
+    size_t                     data_size /**< [in] input data length */
+    )
+{
+    return atca_openssl_md_update((atca_evp_ctx*)ctx, data, data_size);
+}
+
+/** \brief Complete the SHA512 hash in software and return the digest.
+ *
+ * \return ATCA_SUCCESS on success, otherwise an error code.
+ */
+ATCA_STATUS atcac_sw_sha2_512_finish(
+    struct atcac_sha2_512_ctx* ctx,                              /**< [in] pointer to a hash context */
+    uint8_t                    digest[ATCA_SHA2_512_DIGEST_SIZE] /**< [out] output buffer (64 bytes) */
+    )
+{
+    unsigned int outlen = ATCA_SHA2_512_DIGEST_SIZE;
+
+    return atca_openssl_md_finish((atca_evp_ctx*)ctx, digest, &outlen);
+}
+#endif /* ATCAC_SHA512_EN */
 
 /** \brief Initialize context for performing CMAC in software.
  *
@@ -625,25 +713,54 @@ ATCA_STATUS atcac_pk_init(
 {
     ATCA_STATUS status = ATCA_BAD_PARAM;
 
-    ((void)key_type);
-
     if ((NULL != ctx) && (NULL != buf) && ((size_t)INT_MAX > buflen))
     {
         ctx->ptr = EVP_PKEY_new();
 
         if (NULL != ctx->ptr)
         {
-            int ret = EVP_PKEY_set_type((EVP_PKEY*)ctx->ptr, EVP_PKEY_EC);
+            int curve_nid = 0;
+            int ret = 0;
+
+            switch (key_type)
+            {
+                case ATCA_KEY_TYPE_ECCP256:
+                    curve_nid = NID_X9_62_prime256v1;
+                    break;
+        #if ATCA_TA_SUPPORT
+                case TA_KEY_TYPE_ECCP224:
+                    curve_nid = NID_secp224r1;
+                    break;
+                case TA_KEY_TYPE_ECCP384:
+                    curve_nid = NID_secp384r1;
+                    break;
+                case TA_KEY_TYPE_ECCP521:
+                    curve_nid = NID_secp521r1;
+                    break;
+        #endif
+                default:
+                    EVP_PKEY_free((EVP_PKEY*)ctx->ptr);
+                    ret = ATCA_BAD_PARAM;
+                    break;
+            }
+            if (0 != ret)
+            {
+                return ret;
+            }
+
+            ret = EVP_PKEY_set_type((EVP_PKEY*)ctx->ptr, EVP_PKEY_EC);
             if (0 < ret)
             {
-                EC_KEY* ec_key = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
+                EC_KEY* ec_key = EC_KEY_new_by_curve_name(curve_nid);
                 const EC_GROUP * ec_group = EC_KEY_get0_group(ec_key);
                 EC_POINT* ec_point = EC_POINT_new(ec_group);
 
                 if (pubkey)
                 {
-                    BIGNUM * x = BN_bin2bn(buf, 32, NULL);
-                    BIGNUM * y = BN_bin2bn(&buf[32], 32, NULL);
+                    size_t temp_len = buflen / 2u;
+                    int xy_len = (int)temp_len;
+                    BIGNUM * x = BN_bin2bn(buf, xy_len, NULL);
+                    BIGNUM * y = BN_bin2bn(&buf[xy_len], xy_len, NULL);
                     ret = EC_POINT_set_affine_coordinates(ec_group, ec_point, x, y, NULL);
                     BN_free(y);
                     BN_free(x);
@@ -710,13 +827,17 @@ ATCA_STATUS atcac_pk_init_pem(
             /* coverity[cert_exp40_c_violation] Correct usage of OpenSSL 1.1 API */
             /* coverity[misra_c_2012_rule_11_8_violation] Correct usage of OpenSSL 1.1 API */
             BIO* bio = BIO_new_mem_buf((void*)buf, (int)buflen);
-            if (pubkey)
+            if (bio != NULL)
             {
-                ctx->ptr = PEM_read_bio_PUBKEY(bio, NULL, NULL, NULL);
-            }
-            else
-            {
-                ctx->ptr = PEM_read_bio_PrivateKey(bio, NULL, NULL, NULL);
+                if (pubkey)
+                {
+                    ctx->ptr = PEM_read_bio_PUBKEY(bio, NULL, NULL, NULL);
+                }
+                else
+                {
+                    ctx->ptr = PEM_read_bio_PrivateKey(bio, NULL, NULL, NULL);
+                }
+                BIO_free_all(bio);
             }
         }
 
@@ -758,27 +879,56 @@ ATCA_STATUS atcac_pk_public(
 {
     ATCA_STATUS status = ATCA_BAD_PARAM;
 
-    if (NULL != ctx && NULL != ctx->ptr && NULL != buf && NULL != buflen && *buflen >= 64u)
+    if (NULL != ctx && NULL != ctx->ptr && NULL != buf && NULL != buflen)
     {
         int ret = -1;
-        if (EVP_PKEY_EC == EVP_PKEY_id((EVP_PKEY*)ctx->ptr))
+        EVP_PKEY * pkey = (EVP_PKEY*)ctx->ptr;
+
+        if (EVP_PKEY_EC == EVP_PKEY_id(pkey))
         {
-            const EC_KEY * ec_key = EVP_PKEY_get0_EC_KEY((EVP_PKEY*)ctx->ptr);
+            const EC_KEY * ec_key = EVP_PKEY_get0_EC_KEY(pkey);
             if (NULL != ec_key)
             {
-                BIGNUM * x = BN_new();
-                BIGNUM * y = BN_new();
+                const EC_GROUP * group = EC_KEY_get0_group(ec_key);
+                int field_size = EC_GROUP_get_degree(group);
+                int coord_size = (field_size + 7) / 8;
+                size_t xy_coord_size = (coord_size > 0) ? ((size_t)coord_size * 2u) : (0u);
 
-                if (1 == (ret = EC_POINT_get_affine_coordinates(EC_KEY_get0_group(ec_key), EC_KEY_get0_public_key(ec_key), x, y, NULL)))
+                if ((0u != xy_coord_size) && (*buflen >= xy_coord_size))
                 {
-                    (void)BN_bn2bin(x, buf);
-                    (void)BN_bn2bin(y, &buf[32]);
-                    *buflen = 64u;
+                    BIGNUM * x = BN_new();
+                    BIGNUM * y = BN_new();
+
+                    if (1 == (ret = EC_POINT_get_affine_coordinates(group, EC_KEY_get0_public_key(ec_key), x, y, NULL)))
+                    {
+                        (void)BN_bn2binpad(x, buf, coord_size);
+                        (void)BN_bn2binpad(y, &buf[coord_size], coord_size);
+                        *buflen = xy_coord_size;
+                    }
+                    BN_free(x);
+                    BN_free(y);
                 }
-                BN_free(x);
-                BN_free(y);
             }
         }
+        else
+        {
+            const RSA * rsa_key = EVP_PKEY_get0_RSA(pkey);
+            if (NULL != rsa_key)
+            {
+                const BIGNUM * n = RSA_get0_n(rsa_key);
+                if (NULL != n)
+                {
+                    int n_len = BN_num_bytes(n);
+                    if (*buflen >= (size_t)n_len)
+                    {
+                        (void)BN_bn2bin(n, buf);
+                        *buflen = (size_t)n_len;
+                        ret = 1;
+                    }
+                }
+            }
+        }
+
         status = (ret > 0) ? ATCA_SUCCESS : ATCA_FUNC_FAIL;
     }
     return status;
@@ -799,14 +949,21 @@ ATCA_STATUS atcac_pk_sign(
     ATCA_STATUS status = ATCA_BAD_PARAM;
     int ret = 0;
 
-    if ((NULL != ctx) && (NULL != ctx->ptr) && (ATCA_SHA2_256_DIGEST_SIZE == dig_len))
+    if ((NULL != ctx) && (NULL != ctx->ptr))
     {
         if (EVP_PKEY_EC == EVP_PKEY_id((EVP_PKEY*)ctx->ptr))
         {
-            /* coverity[cert_exp40_c_violation] Correct usage of OpenSSL 1.1 API */
-            /* coverity[misra_c_2012_rule_11_8_violation] Correct usage of OpenSSL 1.1 API */
-            ECDSA_SIG* ec_sig = ECDSA_do_sign(digest, (int)dig_len, (EC_KEY*)EVP_PKEY_get0_EC_KEY((EVP_PKEY*)ctx->ptr));
-
+            EC_KEY* tmp_key_ptr = EC_KEY_dup(EVP_PKEY_get0_EC_KEY((EVP_PKEY*)ctx->ptr));
+            ECDSA_SIG* ec_sig = NULL;
+            if (tmp_key_ptr == NULL)
+            {
+                ret = -1;
+            }
+            else
+            {
+                ec_sig = ECDSA_do_sign(digest, (int)dig_len, tmp_key_ptr);
+                EC_KEY_free(tmp_key_ptr);
+            }
             if (NULL != ec_sig)
             {
                 ret = BN_bn2bin(ECDSA_SIG_get0_r(ec_sig), signature);
@@ -868,21 +1025,38 @@ ATCA_STATUS atcac_pk_verify(
     ATCA_STATUS status = ATCA_BAD_PARAM;
     int ret = 0;
 
-    if ((NULL != ctx) && (NULL != ctx->ptr) && (ATCA_SHA2_256_DIGEST_SIZE == dig_len))
+    if ((NULL != ctx) && (NULL != ctx->ptr))
     {
         ret = -1;
         if (EVP_PKEY_EC == EVP_PKEY_id((EVP_PKEY*)ctx->ptr))
         {
             ECDSA_SIG* ec_sig = ECDSA_SIG_new();
-            BIGNUM* r = BN_bin2bn(signature, 32, NULL);
-            BIGNUM* s = BN_bin2bn(&signature[32], 32, NULL);
+            int rs_len = 0;
+            if (sig_len <= (size_t)INT32_MAX)
+            {
+                size_t temp_len = sig_len / 2u;
+                rs_len = (int)temp_len;
+            }
+            BIGNUM* r = BN_bin2bn(signature, rs_len, NULL);
+            BIGNUM* s = BN_bin2bn(&signature[rs_len], rs_len, NULL);
 
             (void)ECDSA_SIG_set0(ec_sig, r, s);
 
-            /* coverity[cert_exp40_c_violation] Correct usage of OpenSSL 1.1 API */
-            /* coverity[misra_c_2012_rule_11_8_violation] Correct usage of OpenSSL 1.1 API */
-            ret = ECDSA_do_verify(digest, (int)dig_len, ec_sig, (EC_KEY*)EVP_PKEY_get0_EC_KEY((EVP_PKEY*)ctx->ptr));
-            ECDSA_SIG_free(ec_sig);
+            if (NULL == ec_sig)
+            {
+                ret = -1;
+            }
+            else
+            {
+                EC_KEY* tmp_key_ptr = EC_KEY_dup(EVP_PKEY_get0_EC_KEY((EVP_PKEY*)ctx->ptr));
+
+                if (NULL != tmp_key_ptr)
+                {
+                    ret = ECDSA_do_verify(digest, (int)dig_len, ec_sig, tmp_key_ptr);
+                    EC_KEY_free(tmp_key_ptr);
+                    ECDSA_SIG_free(ec_sig);
+                }
+            }
         }
         else
         {
@@ -924,10 +1098,10 @@ ATCA_STATUS atcac_pk_verify(
  * \return ATCA_SUCCESS on success, otherwise an error code.
  */
 ATCA_STATUS atcac_pk_derive(
-    struct atcac_pk_ctx* private_ctx,
-    struct atcac_pk_ctx* public_ctx,
-    uint8_t*             buf,
-    size_t*              buflen
+    struct atcac_pk_ctx*    private_ctx,
+    struct atcac_pk_ctx*    public_ctx,
+    uint8_t*                buf,
+    size_t*                 buflen
     )
 {
     ATCA_STATUS status = ATCA_BAD_PARAM;
@@ -943,7 +1117,7 @@ ATCA_STATUS atcac_pk_derive(
             {
             case EVP_PKEY_EC:
             {
-                const EC_POINT *pub_key = EC_KEY_get0_public_key(
+                const EC_POINT* pub_key = EC_KEY_get0_public_key(
                     EVP_PKEY_get0_EC_KEY((EVP_PKEY*)public_ctx->ptr));
 
                 ret = ECDH_compute_key(buf, *buflen, pub_key,
@@ -961,16 +1135,230 @@ ATCA_STATUS atcac_pk_derive(
     return status;
 }
 
-#if defined(ATCA_BUILD_SHARED_LIBS) || !defined(ATCA_NO_HEAP)
+ATCA_STATUS atcac_parse_der(struct atcac_x509_ctx** cert, cal_buffer* der)
+{
+    ATCA_STATUS status = ATCA_BAD_PARAM;
+
+    if (NULL != cert && NULL != der)
+    {
+        if (UINT64_MAX > der->len)
+        {
+            const unsigned char* in = der->buf;
+            if (NULL != d2i_X509((X509 **)cert, &in, (long)der->len))
+            {
+                status = ATCA_SUCCESS;
+            }
+        }
+    }
+    return status;
+}
+
+static ATCA_STATUS atcac_read_asn1_string(const ASN1_STRING * as, cal_buffer* buf, uint8_t * tag)
+{
+    ATCA_STATUS status;
+
+    if (NULL != as && 0 < as->length)
+    {
+        if (ATCA_SUCCESS == (status = cal_buf_write_bytes(buf, 0U, as->data, (size_t)as->length)))
+        {
+            if (NULL != tag)
+            {
+                if (as->type >= 0 && as->type <= 255)
+                {
+                    *tag = (uint8_t)as->type;
+                }
+            }
+            status = cal_buf_set_used(buf, (size_t)as->length);
+        }
+
+    }
+    else
+    {
+        /* No data is available */
+        status = cal_buf_set_used(buf, 0U);
+    }
+
+    return status;
+}
+
+ATCA_STATUS atcac_get_subject(const struct atcac_x509_ctx* cert, cal_buffer* cert_subject)
+{
+    ATCA_STATUS status = ATCA_BAD_PARAM;
+
+    if (NULL != cert && NULL != cert_subject)
+    {
+        X509_NAME* sub_name = X509_get_subject_name((const X509 *)&cert->ptr);
+        if (NULL != sub_name)
+        {
+            size_t length = 0U;
+            const unsigned char *tmp_ptr = NULL;
+            if (1 == X509_NAME_get0_der(sub_name, &tmp_ptr, &length))
+            {
+                if (ATCA_SUCCESS == (status = cal_buf_write_bytes(cert_subject, 0U, tmp_ptr, length)))
+                {
+                    status = cal_buf_set_used(cert_subject, length);
+                }
+            }
+        }
+    }
+    else
+    {
+        /* No data is available */
+        status = cal_buf_set_used(cert_subject, 0U);
+    }
+    return status;
+}
+
+ATCA_STATUS atcac_get_subj_public_key(const struct atcac_x509_ctx * cert, cal_buffer * subj_public_key)
+{
+    ATCA_STATUS status = ATCA_BAD_PARAM;
+
+    if (NULL != cert && NULL != subj_public_key)
+    {
+        atcac_pk_ctx_t pk;
+        if (NULL != (pk.ptr = X509_get0_pubkey((const X509*)&cert->ptr)))
+        {
+            status = atcac_pk_public(&pk, subj_public_key->buf, &subj_public_key->len);
+        }
+    }
+
+    return status;
+}
+
+ATCA_STATUS atcac_get_subj_key_id(const struct atcac_x509_ctx * cert, cal_buffer * subj_public_key_id)
+{
+    ATCA_STATUS status = ATCA_BAD_PARAM;
+
+    if (NULL != cert && NULL != subj_public_key_id)
+    {
+        ASN1_OCTET_STRING * ext = (ASN1_OCTET_STRING*)X509_get_ext_d2i((const X509*)&cert->ptr, NID_subject_key_identifier, NULL, NULL);
+        if (NULL != ext)
+        {
+            status = atcac_read_asn1_string(ext, subj_public_key_id, NULL);
+            ASN1_OCTET_STRING_free(ext);
+        }
+    }
+    return status;
+}
+
+ATCA_STATUS atcac_get_issuer(const struct atcac_x509_ctx* cert, cal_buffer* issuer_buf)
+{
+    ATCA_STATUS status = ATCA_BAD_PARAM;
+
+    if (NULL != cert && NULL != issuer_buf)
+    {
+        X509_NAME* sub_name = (X509_NAME*)X509_get_issuer_name((const X509*)&cert->ptr);
+        uint8_t x509_sub_name_enc_buf[256] = { 0 }; //Given max size as 256 bytes for issuer name
+        const unsigned char* tmp_buf = x509_sub_name_enc_buf;
+        if (NULL != sub_name)
+        {
+            if (1 == X509_NAME_get0_der(sub_name, &tmp_buf, &issuer_buf->len))
+            {
+                if (ATCA_SUCCESS == (status = cal_buf_write_bytes(issuer_buf, 0U, tmp_buf, issuer_buf->len)))
+                {
+                    status = cal_buf_set_used(issuer_buf, issuer_buf->len);
+                }
+            }
+        }
+    }
+    else
+    {
+        /* No data is available */
+        status = cal_buf_set_used(issuer_buf, 0U);
+    }
+    return status;
+}
+
+ATCA_STATUS atcac_get_auth_key_id(const struct atcac_x509_ctx * cert, cal_buffer * auth_key_id)
+{
+    ATCA_STATUS status = ATCA_BAD_PARAM;
+
+    if (NULL != cert && NULL != auth_key_id)
+    {
+        AUTHORITY_KEYID * ext = (AUTHORITY_KEYID*)X509_get_ext_d2i((const X509*)&cert->ptr, NID_authority_key_identifier, NULL, NULL);
+
+        if (NULL != ext && NULL != ext->keyid)
+        {
+            status = atcac_read_asn1_string(ext->keyid, auth_key_id, NULL);
+            AUTHORITY_KEYID_free(ext);
+        }
+        else
+        {
+            /* No data is available */
+            status = cal_buf_set_used(auth_key_id, 0U);
+        }
+    }
+    return status;
+}
+
+ATCA_STATUS atcac_get_issue_date(const struct atcac_x509_ctx * cert, cal_buffer* not_before, uint8_t * fmt)
+{
+    ATCA_STATUS status = ATCA_BAD_PARAM;
+
+    if (NULL != cert && NULL != not_before)
+    {
+        status = atcac_read_asn1_string(X509_get0_notBefore((const X509*)&cert->ptr), not_before, fmt);
+    }
+    return status;
+}
+
+ATCA_STATUS atcac_get_expire_date(const struct atcac_x509_ctx * cert, cal_buffer* not_after, uint8_t * fmt)
+{
+    ATCA_STATUS status = ATCA_BAD_PARAM;
+
+    if (NULL != cert && NULL != not_after)
+    {
+        status = atcac_read_asn1_string(X509_get0_notAfter((const X509*)&cert->ptr), not_after, fmt);
+    }
+    return status;
+}
+
+ATCA_STATUS atcac_get_cert_sn(const struct atcac_x509_ctx * cert, cal_buffer * cert_sn)
+{
+    ATCA_STATUS status = ATCA_BAD_PARAM;
+
+    if (NULL != cert && NULL != cert_sn)
+    {
+        status = atcac_read_asn1_string(X509_get0_serialNumber((const X509*)&cert->ptr), cert_sn, NULL);
+    }
+
+    return status;
+}
+
+void atcac_x509_free(void* cert)
+{
+    if (NULL != cert)
+    {
+        X509_free((X509 *)cert);
+    }
+}
+
+#if defined(ATCA_BUILD_SHARED_LIBS) || defined(ATCA_HEAP)
 struct atcac_sha1_ctx * atcac_sha1_ctx_new(void)
 {
     return (struct atcac_sha1_ctx*)hal_malloc(sizeof(atcac_sha1_ctx_t));
 }
 
+#if ATCAC_SHA256_EN
 struct atcac_sha2_256_ctx * atcac_sha256_ctx_new(void)
 {
     return (struct atcac_sha2_256_ctx*)hal_malloc(sizeof(atcac_sha2_256_ctx_t));
 }
+#endif
+
+#if ATCAC_SHA384_EN
+struct atcac_sha2_384_ctx * atcac_sha384_ctx_new(void)
+{
+    return (struct atcac_sha2_384_ctx*)hal_malloc(sizeof(atcac_sha2_384_ctx_t));
+}
+#endif
+
+#if ATCAC_SHA512_EN
+struct atcac_sha2_512_ctx * atcac_sha512_ctx_new(void)
+{
+    return (struct atcac_sha2_512_ctx*)hal_malloc(sizeof(atcac_sha2_512_ctx_t));
+}
+#endif
 
 struct atcac_hmac_ctx * atcac_hmac_ctx_new(void)
 {
@@ -997,10 +1385,26 @@ void atcac_sha1_ctx_free(struct atcac_sha1_ctx * ctx)
     hal_free(ctx);
 }
 
+#if ATCAC_SHA256_EN
 void atcac_sha256_ctx_free(struct atcac_sha2_256_ctx * ctx)
 {
     hal_free(ctx);
 }
+#endif
+
+#if ATCAC_SHA384_EN
+void atcac_sha384_ctx_free(struct atcac_sha2_384_ctx * ctx)
+{
+    hal_free(ctx);
+}
+#endif
+
+#if ATCAC_SHA512_EN
+void atcac_sha512_ctx_free(struct atcac_sha2_512_ctx * ctx)
+{
+    hal_free(ctx);
+}
+#endif
 
 void atcac_hmac_ctx_free(struct atcac_hmac_ctx * ctx)
 {

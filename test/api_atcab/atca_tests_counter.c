@@ -33,7 +33,7 @@
 
 #if TEST_ATCAB_COUNTER_EN
 
-#ifdef ATCA_ECC_SUPPORT
+#if ATCA_ECC_SUPPORT
 
 TEST_CONDITION(atca_cmd_basic_test, counter_test)
 {
@@ -70,7 +70,11 @@ TEST(atca_cmd_basic_test, counter_test)
 
     // Check bad counter ID
     status = atcab_counter_increment(3, NULL);
+#if ATCA_CHECK_PARAMS_EN
     TEST_ASSERT_EQUAL(ATCA_BAD_PARAM, status);
+#else
+    TEST_ASSERT_EQUAL(ATCA_PARSE_ERROR, status);
+#endif
 }
 
 /*
@@ -247,7 +251,7 @@ t_test_case_info counter_basic_test_info[] =
 #if ATCA_CA_SUPPORT || ATCA_CA2_SUPPORT
     { REGISTER_TEST_CASE(atca_cmd_basic_test, counter_write_test), REGISTER_TEST_CONDITION(atca_cmd_basic_test, counter_write_test) },
 #endif
-#ifdef ATCA_ECC_SUPPORT
+#if ATCA_ECC_SUPPORT
     { REGISTER_TEST_CASE(atca_cmd_basic_test, counter_test),       REGISTER_TEST_CONDITION(atca_cmd_basic_test, counter_test) },
     { REGISTER_TEST_CASE(atca_cmd_basic_test, counter_match),      atca_test_cond_ecc608 },
 #endif

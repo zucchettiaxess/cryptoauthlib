@@ -55,56 +55,67 @@
  */
 ATCA_STATUS calib_secureboot(ATCADevice device, uint8_t mode, uint16_t param2, const uint8_t* digest, const uint8_t* signature, uint8_t* mac)
 {
-    ATCAPacket packet;
-    ATCA_STATUS status = ATCA_GEN_FAIL;
-
-    if ((device == NULL) || (digest == NULL))
-    {
-        return ATCA_TRACE(ATCA_BAD_PARAM, "NULL pointer received");
-    }
-
-    #if (CA_MAX_PACKET_SIZE < (ATCA_CMD_SIZE_MIN + SECUREBOOT_DIGEST_SIZE + SECUREBOOT_SIGNATURE_SIZE))
-    #if ATCA_PREPROCESSOR_WARNING
-    #warning "CA_MAX_PACKET_SIZE will not support full or fullcopy mode in secureboot command"
-    #endif
-    if (NULL != signature)
-    {
-        status = ATCA_TRACE(ATCA_INVALID_SIZE, "Unsupported parameter");
-    }
-    #endif
+    ATCAPacket * packet = NULL;
+    ATCA_STATUS status;
 
     do
     {
-        packet.param1 = mode;
-        packet.param2 = param2;
+        if ((device == NULL) || (digest == NULL))
+        {
+            status = ATCA_TRACE(ATCA_BAD_PARAM, "NULL pointer received");
+            break;
+        }
 
-        (void)memcpy(packet.data, digest, SECUREBOOT_DIGEST_SIZE);
+        #if (CA_MAX_PACKET_SIZE < (ATCA_CMD_SIZE_MIN + SECUREBOOT_DIGEST_SIZE + SECUREBOOT_SIGNATURE_SIZE))
+        #if ATCA_PREPROCESSOR_WARNING
+        #warning "CA_MAX_PACKET_SIZE will not support full or fullcopy mode in secureboot command"
+        #endif
+        if (NULL != signature)
+        {
+            status = ATCA_TRACE(ATCA_INVALID_SIZE, "Unsupported parameter");
+        }
+        #endif
+
+        packet = calib_packet_alloc();
+        if(NULL == packet)
+        {
+            (void)ATCA_TRACE(ATCA_ALLOC_FAILURE, "calib_packet_alloc - failed");
+            status = ATCA_ALLOC_FAILURE;
+            break;
+        }
+        
+        (void)memset(packet, 0x00, sizeof(ATCAPacket));
+
+        packet->param1 = mode;
+        packet->param2 = param2;
+
+        (void)memcpy(packet->data, digest, SECUREBOOT_DIGEST_SIZE);
 
         if (NULL != signature)
         {
-            (void)memcpy(&packet.data[SECUREBOOT_DIGEST_SIZE], signature, SECUREBOOT_SIGNATURE_SIZE);
+            (void)memcpy(&packet->data[SECUREBOOT_DIGEST_SIZE], signature, SECUREBOOT_SIGNATURE_SIZE);
         }
 
-        if ((status = atSecureBoot(atcab_get_device_type_ext(device), &packet)) != ATCA_SUCCESS)
+        if ((status = atSecureBoot(atcab_get_device_type_ext(device), packet)) != ATCA_SUCCESS)
         {
             (void)ATCA_TRACE(status, "atSecureBoot - failed");
             break;
         }
 
-        if ((status = atca_execute_command(&packet, device)) != ATCA_SUCCESS)
+        if ((status = atca_execute_command(packet, device)) != ATCA_SUCCESS)
         {
             (void)ATCA_TRACE(status, "calib_secureboot - execution failed");
             break;
         }
 
-        if ((mac != NULL) && (packet.data[ATCA_COUNT_IDX] >= SECUREBOOT_RSP_SIZE_MAC))
+        if ((mac != NULL) && (packet->data[ATCA_COUNT_IDX] >= SECUREBOOT_RSP_SIZE_MAC))
         {
-            (void)memcpy(mac, &packet.data[ATCA_RSP_DATA_IDX], SECUREBOOT_MAC_SIZE);
+            (void)memcpy(mac, &packet->data[ATCA_RSP_DATA_IDX], SECUREBOOT_MAC_SIZE);
         }
 
-    }
-    while (false);
+    } while (false);
 
+    calib_packet_free(packet);
     return status;
 }
 #endif /* CALIB_SECUREBOOT_EN */
@@ -126,9 +137,10 @@ ATCA_STATUS calib_secureboot(ATCADevice device, uint8_t mode, uint16_t param2, c
  *
  * \return ATCA_SUCCESS on success, otherwise an error code.
  */
-ATCA_STATUS calib_secureboot_mac(ATCADevice device, uint8_t mode, const uint8_t* digest, const uint8_t* signature, const uint8_t* num_in, const uint8_t* io_key, bool* is_verified)
+ATCA_STATUS calib_secureboot_mac(ATCADevice device, uint8_t mode, const uint8_t* digest, const uint8_t* signature, const uint8_t* num_in, const uint8_t* io_key,
+                                 bool* is_verified)
 {
-    ATCA_STATUS status = ATCA_GEN_FAIL;
+    ATCA_STATUS status;
     atca_temp_key_t tempkey;
     atca_nonce_in_out_t nonce_params;
     atca_secureboot_enc_in_out_t sboot_enc_params;
@@ -226,8 +238,7 @@ ATCA_STATUS calib_secureboot_mac(ATCADevice device, uint8_t mode, const uint8_t*
         }
 
         *is_verified = (memcmp(host_mac, mac, SECUREBOOT_MAC_SIZE) == 0);
-    }
-    while (false);
+    } while (false);
 
     return status;
 }

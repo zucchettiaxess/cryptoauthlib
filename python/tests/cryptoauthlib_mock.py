@@ -2210,13 +2210,16 @@ class atcab_mock(object):
         if not isinstance(device_private_key_slot, int):
             raise TypeError
 
-        if not isinstance(challenge, bytes):
+        if not isinstance(challenge, c_ptr):
             raise TypeError
 
         if not isinstance(response, c_ptr):
             raise TypeError
 
-        memmove(cast(response, c_void_p).value, cast(byref(self.r_response), c_void_p).value, len(self.r_response))
+        response_ptr = cast(response, POINTER(cal_buffer))
+        response_ptr.contents.len = len(self.r_response)
+
+        memmove(cast(response_ptr.contents.buf, c_void_p).value, cast(byref(self.r_response), c_void_p).value, len(self.r_response))
 
         return Status.ATCA_SUCCESS
 
@@ -2233,7 +2236,7 @@ class atcab_mock(object):
 
     def atcacert_read_cert(self, cert_def, ca_public_key, cert, cert_size):
 
-        if not isinstance(ca_public_key, bytes):
+        if not isinstance(ca_public_key, c_ptr):
             raise TypeError
 
         if not isinstance(cert, c_ptr):

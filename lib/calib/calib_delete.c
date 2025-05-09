@@ -55,33 +55,44 @@
  */
 ATCA_STATUS calib_delete_base(ATCADevice device, uint8_t mode, uint16_t key_id, const uint8_t* mac)
 {
-    ATCAPacket packet;
-    ATCA_STATUS status = ATCA_GEN_FAIL;
-
-    // Verify the inputs
-    if ((device == NULL) || (mac == NULL))
-    {
-        return ATCA_TRACE(ATCA_BAD_PARAM, "NULL pointer received");
-    }
+    ATCAPacket * packet = NULL;
+    ATCA_STATUS status;
 
     do
     {
+        // Verify the inputs
+        if ((device == NULL) || (mac == NULL))
+        {
+            status = ATCA_TRACE(ATCA_BAD_PARAM, "NULL pointer received");
+            break;
+        }
+
+        packet = calib_packet_alloc();
+        if(NULL == packet)
+        {
+            (void)ATCA_TRACE(ATCA_ALLOC_FAILURE, "calib_packet_alloc - failed");
+            status = ATCA_ALLOC_FAILURE;
+            break;
+        }
+
+        (void)memset(packet, 0x00, sizeof(ATCAPacket));
+
         // build Delete command
-        packet.param1 = mode;
-        packet.param2 = key_id;
+        packet->param1 = mode;
+        packet->param2 = key_id;
 
-        (void)memcpy(&packet.data[0], mac, DELETE_MAC_SIZE);
+        (void)memcpy(&packet->data[0], mac, DELETE_MAC_SIZE);
 
-        (void)atDelete(atcab_get_device_type_ext(device), &packet);
+        (void)atDelete(atcab_get_device_type_ext(device), packet);
 
-        if ((status = atca_execute_command( (void*)&packet, device)) != ATCA_SUCCESS)
+        if ((status = atca_execute_command((void*)packet, device)) != ATCA_SUCCESS)
         {
             (void)ATCA_TRACE(status, "calib_delete - execution failed");
             break;
         }
-    }
-    while (false);
+    } while (false);
 
+    calib_packet_free(packet);
     return status;
 }
 
@@ -94,7 +105,7 @@ ATCA_STATUS calib_delete_base(ATCADevice device, uint8_t mode, uint16_t key_id, 
  */
 ATCA_STATUS calib_delete(ATCADevice device, uint8_t num_in[NONCE_NUMIN_SIZE], const uint8_t *key)
 {
-    ATCA_STATUS status = ATCA_GEN_FAIL;
+    ATCA_STATUS status;
     uint8_t serial_number[ATCA_SERIAL_NUM_SIZE] = { 0 };
     uint8_t rand_out[RANDOM_NUM_SIZE] = { 0 };
     atca_delete_in_out_t delete_mac_params;
@@ -129,8 +140,7 @@ ATCA_STATUS calib_delete(ATCADevice device, uint8_t num_in[NONCE_NUMIN_SIZE], co
             (void)ATCA_TRACE(status, "Delete Mac failed");
             break;
         }
-    }
-    while (false);
+    } while (false);
 
     return calib_delete_base(device, DELETE_MODE, (uint16_t)0x0000, mac);
 }

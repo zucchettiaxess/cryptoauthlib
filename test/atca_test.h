@@ -80,10 +80,6 @@ typedef struct
 
 #define TEST_CONDITION(group, name)             bool TEST_ ## group ## _ ## name ## _cond(void)
 
-#if !defined(ATCA_ECC_SUPPORT) && !defined(DO_NOT_TEST_CERT)
-#define DO_NOT_TEST_CERT
-#endif
-
 #ifndef DO_NOT_TEST_CERT
 #include "atcacert/atcacert_check_config.h"
 #endif
@@ -92,7 +88,7 @@ typedef struct
 #include "host/atca_host.h"
 #endif
 
-#if ATCA_TA_SUPPORT
+#if ATCA_TA_SUPPORT && !LIBRARY_USAGE_EN_CHECK
 #include "api_talib/test_talib.h"
 #endif
 
@@ -153,9 +149,14 @@ void atca_test_assert_data_is_unlocked(UNITY_LINE_TYPE from_line);
 void atca_test_assert_data_is_locked(UNITY_LINE_TYPE from_line);
 void atca_test_assert_random_buffer(UNITY_LINE_TYPE from_line, uint8_t * buf, size_t buflen);
 void atca_test_assert_aes_enabled(UNITY_LINE_TYPE from_line);
-#if ATCA_TA_SUPPORT
+#if ATCA_TA_SUPPORT && !LIBRARY_USAGE_EN_CHECK
 void atca_test_assert_ta_sboot_enabled(UNITY_LINE_TYPE from_line, uint8_t mode);
 void atca_test_assert_ta_sboot_preboot_enabled(UNITY_LINE_TYPE from_line);
+void atca_test_assert_ta_sboot_preboot_digest_type_enabled(UNITY_LINE_TYPE from_line, uint8_t mode);
+void atca_test_assert_ta_sboot_digest_type_enabled(UNITY_LINE_TYPE from_line, uint8_t mode);
+#endif
+#if ATCA_TA_SUPPORT
+void atca_test_assert_ta_check_handle_validity(UNITY_LINE_TYPE from_line, uint16_t handle);
 #endif
 
 #define unit_test_assert_config_is_locked()     atca_test_assert_config_is_locked(__LINE__)
@@ -172,20 +173,36 @@ void atca_test_assert_ta_sboot_preboot_enabled(UNITY_LINE_TYPE from_line);
 #define check_config_aes_enable()               atca_test_assert_aes_enabled(__LINE__)
 #define check_config_ta_sboot_enable(mode)      atca_test_assert_ta_sboot_enabled(__LINE__, mode)
 #define check_config_ta_sboot_preboot_enable()  atca_test_assert_ta_sboot_preboot_enabled(__LINE__)
+#define check_config_ta_sboot_preboot_digest_type_enable(mode) atca_test_assert_ta_sboot_preboot_digest_type_enabled(__LINE__, mode)
+#define check_config_ta_sboot_digest_type_enable(mode) atca_test_assert_ta_sboot_digest_type_enabled(__LINE__, mode)
+#define check_tatflex_handle_validity(handle)        atca_test_assert_ta_check_handle_validity(__LINE__, handle)
 
-
-#define TEST_TYPE_ECC_SIGN          (1)
-#define TEST_TYPE_ECC_VERIFY        (2)
-#define TEST_TYPE_ECC_GENKEY        (3)
-#define TEST_TYPE_AES               (4)
-#define TEST_TYPE_DATA              (5)
-#define TEST_TYPE_HMAC              (6)
-#define TEST_TYPE_ECDH              (7)
-#define TEST_TYPE_AUTH_HMAC         (8)
-#define TEST_TYPE_AUTH_CMAC         (9)
-#define TEST_TYPE_AUTH_GCM          (10)
-#define TEST_TYPE_ECC_ROOT_KEY      (11)
-#define TEST_TYPE_TEMPLATE_DATA     (12)
+#define TEST_TYPE_ECC_SIGN               (1)
+#define TEST_TYPE_ECC_VERIFY             (2)
+#define TEST_TYPE_ECC_GENKEY             (3)
+#define TEST_TYPE_AES                    (4)
+#define TEST_TYPE_DATA                   (5)
+#define TEST_TYPE_HMAC                   (6)
+#define TEST_TYPE_ECDH                   (7)
+#define TEST_TYPE_AUTH_HMAC              (8)
+#define TEST_TYPE_AUTH_CMAC              (9)
+#define TEST_TYPE_AUTH_GCM               (10)
+#define TEST_TYPE_ECC_ROOT_KEY           (11)
+#define TEST_TYPE_ECC_ROOTED25519_KEY    (12)
+#define TEST_TYPE_ECC_ROOTRSA2K_KEY      (13)
+#define TEST_TYPE_TEMPLATE_DATA          (14)
+#define TEST_TYPE_CRL_KEY_SIGN           (15)
+#define TEST_TYPE_ECC_ROOT_KEY_P384      (16)
+#define TEST_TYPE_ECC_ROOT_KEY_P521      (17)
+#define TEST_TYPE_ECC_ROOT_KEY_ED25519   (18)
+#define TEST_TYPE_RSA3072_CERT           (19)
+#define TEST_TYPE_RSA2048_SIGN           (20)
+#define TEST_TYPE_AUTH_HANDLE            (21)
+#define TEST_TYPE_CERT_DATA              (22)
+#define TEST_TYPE_SUBJKEY_HANDLE         (23)
+#define TEST_TYPE_PVT_KEY_HANDLE         (24)
+#define TEST_TYPE_EC_P384_SIGN           (25)
+#define TEST_TYPE_EC_P521_SIGN           (26)
 
 typedef struct
 {
@@ -207,16 +224,17 @@ void RunPbkdf2Tests(void);
 
 /* Setup & Configuration */
 void atca_test_config_set_ifacecfg(ATCAIfaceCfg * ifacecfg);
-#if defined(ATCA_ECC_SUPPORT) || defined(ATCA_ECC204_SUPPORT) || defined(ATCA_TA010_SUPPORT) || ATCA_TA_SUPPORT
-ATCA_STATUS atca_test_genkey(uint16_t key_id, uint8_t *public_key);
+#if ATCA_ECC_SUPPORT || defined(ATCA_ECC204_SUPPORT) || defined(ATCA_TA010_SUPPORT) || ATCA_TA_SUPPORT
+ATCA_STATUS atca_test_genkey(ATCADevice device, uint16_t key_id, cal_buffer *public_key);
 #endif
 ATCADeviceType atca_test_get_device_type(void);
 bool atca_test_cond_p256_all(void);
 bool atca_test_cond_p256_sign(void);
 bool atca_test_cond_p256_sign_verify(void);
 bool atca_test_cond_aes128_ecb(void);
+bool atca_test_cond_aes_ccm(void);
 bool atca_test_cond_ecc608(void);
-bool atca_test_cond_ta100(void);
+bool atca_test_cond_ta(void);
 bool atca_test_cond_ca2(void);
 
 /* Commands */

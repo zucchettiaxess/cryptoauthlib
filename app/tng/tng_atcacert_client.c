@@ -30,27 +30,54 @@
 #include "tng_atcacert_client.h"
 #include "tngtls_cert_def_1_signer.h"
 #include "tng_root_cert.h"
+#include <limits.h>
+
+#if ATCACERT_COMPCERT_EN
 
 int tng_atcacert_max_device_cert_size(size_t* max_cert_size)
 {
     int ret = ATCACERT_E_WRONG_CERT_DEF;
     int index = 0;
-    size_t cert_size;
+    size_t cert_size = 0;
+    size_t current_max_cert_size = 0;
     const atcacert_def_t* cert_def;
 
-    do
+    if (NULL != max_cert_size)
     {
-        cert_def = tng_map_get_device_cert_def(index++);
-        if (NULL != cert_def)
+        do
         {
-            ret = atcacert_max_cert_size(cert_def, &cert_size);
-            if (cert_size > *max_cert_size)
+            cert_def = tng_map_get_device_cert_def(index);
+
+            if (NULL != cert_def)
             {
-                *max_cert_size = cert_size;
+                ret = atcacert_max_cert_size(cert_def, &cert_size);
+                if (ATCACERT_E_SUCCESS != ret)
+                {
+                    break;
+                }
+
+                if (cert_size > current_max_cert_size)
+                {
+                    current_max_cert_size = cert_size;
+                }
+
+                if (index < INT_MAX)
+                {
+                    index++;
+                }
+                else
+                {
+                    ret = ATCACERT_E_WRONG_CERT_DEF;
+                    break;
+                }
             }
+        } while ((NULL != cert_def) && (ret == ATCACERT_E_SUCCESS));
+
+        if (ret == ATCACERT_E_SUCCESS)
+        {
+            *max_cert_size = current_max_cert_size;
         }
     }
-    while ((NULL != cert_def) && (ret != ATCACERT_E_SUCCESS));
 
     return ret;
 }
@@ -60,6 +87,7 @@ int tng_atcacert_read_device_cert(uint8_t* cert, size_t* cert_size, const uint8_
     int ret;
     const atcacert_def_t* cert_def = NULL;
     uint8_t ca_public_key[72];
+    cal_buffer ca_pubkey = CAL_BUF_INIT(ATCA_ECCP256_PUBKEY_SIZE, ca_public_key);
 
     ret = tng_get_device_cert_def(&cert_def);
     if (ret != ATCA_SUCCESS)
@@ -74,7 +102,7 @@ int tng_atcacert_read_device_cert(uint8_t* cert, size_t* cert_size, const uint8_
             cert_def->ca_cert_def,
             signer_cert,
             cert_def->ca_cert_def->cert_template_size,  // Cert size doesn't need to be accurate
-            ca_public_key);
+            &ca_pubkey);
         if (ret != ATCACERT_E_SUCCESS)
         {
             return ret;
@@ -95,7 +123,7 @@ int tng_atcacert_read_device_cert(uint8_t* cert, size_t* cert_size, const uint8_
         }
     }
 
-    return atcacert_read_cert(cert_def, ca_public_key, cert, cert_size);
+    return atcacert_read_cert(cert_def, &ca_pubkey, cert, cert_size);
 }
 
 int tng_atcacert_device_public_key(uint8_t* public_key, uint8_t* cert)
@@ -144,17 +172,13 @@ int tng_atcacert_read_signer_cert(uint8_t* cert, size_t* cert_size)
 {
     int ret;
     const atcacert_def_t* cert_def = NULL;
-    const uint8_t* ca_public_key = NULL;
+    const cal_buffer ca_public_key = cal_buf_init_const_ptr(ATCA_ECCP256_PUBKEY_SIZE, &g_cryptoauth_root_ca_002_cert[CRYPTOAUTH_ROOT_CA_002_PUBLIC_KEY_OFFSET]);
 
     ret = tng_get_device_cert_def(&cert_def);
     if (ATCA_SUCCESS == ret)
     {
         cert_def = cert_def->ca_cert_def;
-
-        // Get the CA (root) public key
-        ca_public_key = &g_cryptoauth_root_ca_002_cert[CRYPTOAUTH_ROOT_CA_002_PUBLIC_KEY_OFFSET];
-
-        ret = atcacert_read_cert(cert_def, ca_public_key, cert, cert_size);
+        ret = atcacert_read_cert(cert_def, &ca_public_key, cert, cert_size);
     }
 
     return ret;
@@ -165,6 +189,7 @@ int tng_atcacert_signer_public_key(uint8_t* public_key, uint8_t* cert)
     int ret;
     const atcacert_def_t* cert_def = NULL;
     uint8_t raw_public_key[72];
+    cal_buffer pubkey = CAL_BUF_INIT(ATCA_ECCP256_PUBKEY_SIZE, public_key);
 
     if (public_key == NULL)
     {
@@ -178,7 +203,7 @@ int tng_atcacert_signer_public_key(uint8_t* public_key, uint8_t* cert)
             &g_tngtls_cert_def_1_signer,
             cert,
             g_tngtls_cert_def_1_signer.cert_template_size,  // cert size doesn't need to be accurate
-            public_key);
+            &pubkey);
     }
     else
     {
@@ -247,3 +272,5 @@ int tng_atcacert_root_public_key(uint8_t* public_key)
 
     return ATCACERT_E_SUCCESS;
 }
+
+#endif

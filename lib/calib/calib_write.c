@@ -60,9 +60,15 @@
  */
 ATCA_STATUS calib_write(ATCADevice device, uint8_t zone, uint16_t address, const uint8_t *value, const uint8_t *mac)
 {
-    ATCAPacket packet;
-    ATCA_STATUS status = ATCA_GEN_FAIL;
+    ATCAPacket * packet = calib_packet_alloc();
+    ATCA_STATUS status;
     bool require_mac = false;
+
+    if(NULL == packet)
+    {
+        (void)ATCA_TRACE(ATCA_ALLOC_FAILURE, "calib_packet_alloc - failed");
+        return ATCA_ALLOC_FAILURE;
+    }
 
     if ((device == NULL) || (value == NULL))
     {
@@ -81,23 +87,25 @@ ATCA_STATUS calib_write(ATCADevice device, uint8_t zone, uint16_t address, const
 
     do
     {
+        (void)memset(packet, 0x00, sizeof(ATCAPacket));
+
         // Build the write command
-        packet.param1 = zone;
-        packet.param2 = address;
+        packet->param1 = zone;
+        packet->param2 = address;
         if ((zone & ATCA_ZONE_READWRITE_32) == ATCA_ZONE_READWRITE_32)
         {
             // 32-byte write
-            (void)memcpy(packet.data, value, 32);
+            (void)memcpy(packet->data, value, 32);
             // Only 32-byte writes can have a MAC
             if (NULL != mac)
             {
-                (void)memcpy(&packet.data[32], mac, 32);
+                (void)memcpy(&packet->data[32], mac, 32);
             }
         }
         else
         {
             // 4-byte write
-            (void)memcpy(packet.data, value, 4);
+            (void)memcpy(packet->data, value, 4);
         }
 
         if ((NULL != mac) && ((zone & ATCA_ZONE_READWRITE_32) == ATCA_ZONE_READWRITE_32))
@@ -105,21 +113,21 @@ ATCA_STATUS calib_write(ATCADevice device, uint8_t zone, uint16_t address, const
             require_mac = true;
         }
 
-        if ((status = atWrite(atcab_get_device_type_ext(device), &packet, require_mac)) != ATCA_SUCCESS)
+        if ((status = atWrite(atcab_get_device_type_ext(device), packet, require_mac)) != ATCA_SUCCESS)
         {
             (void)ATCA_TRACE(status, "atWrite - failed");
             break;
         }
 
-        if ((status = atca_execute_command(&packet, device)) != ATCA_SUCCESS)
+        if ((status = atca_execute_command(packet, device)) != ATCA_SUCCESS)
         {
             (void)ATCA_TRACE(status, "calib_write - execution failed");
             break;
         }
 
-    }
-    while (false);
+    } while (false);
 
+    calib_packet_free(packet);
     return status;
 }
 
@@ -140,7 +148,7 @@ ATCA_STATUS calib_write(ATCADevice device, uint8_t zone, uint16_t address, const
  */
 ATCA_STATUS calib_write_zone(ATCADevice device, uint8_t zone, uint16_t slot, uint8_t block, uint8_t offset, const uint8_t *data, uint8_t len)
 {
-    ATCA_STATUS status = ATCA_GEN_FAIL;
+    ATCA_STATUS status;
     uint16_t addr;
 
     // Check the input parameters
@@ -171,8 +179,7 @@ ATCA_STATUS calib_write_zone(ATCADevice device, uint8_t zone, uint16_t slot, uin
 
         status = calib_write(device, zone, addr, data, NULL);
 
-    }
-    while (false);
+    } while (false);
 
     return status;
 }
@@ -203,10 +210,11 @@ ATCA_STATUS calib_write_enc(ATCADevice device, uint16_t key_id, uint8_t block, c
     uint8_t num_in[NONCE_NUMIN_SIZE] = { 0 };
 
 #else
-ATCA_STATUS calib_write_enc(ATCADevice device, uint16_t key_id, uint8_t block, const uint8_t *data, const uint8_t* enc_key, const uint16_t enc_key_id, const uint8_t num_in[NONCE_NUMIN_SIZE])
+ATCA_STATUS calib_write_enc(ATCADevice device, uint16_t key_id, uint8_t block, const uint8_t *data, const uint8_t* enc_key, const uint16_t enc_key_id,
+                            const uint8_t num_in[NONCE_NUMIN_SIZE])
 {
 #endif
-    ATCA_STATUS status = ATCA_GEN_FAIL;
+    ATCA_STATUS status;
     uint8_t zone = ATCA_ZONE_DATA | ATCA_ZONE_READWRITE_32;
     atca_nonce_in_out_t nonce_params;
     atca_gen_dig_in_out_t gen_dig_param;
@@ -315,8 +323,7 @@ ATCA_STATUS calib_write_enc(ATCADevice device, uint16_t key_id, uint8_t block, c
 
         status = calib_write(device, write_mac_param.zone, write_mac_param.key_id, write_mac_param.encrypted_data, write_mac_param.auth_mac);
 
-    }
-    while (false);
+    } while (false);
 
     return status;
 }
@@ -342,7 +349,7 @@ ATCA_STATUS calib_write_enc(ATCADevice device, uint16_t key_id, uint8_t block, c
 #if CALIB_WRITE_EN
 ATCA_STATUS calib_write_config_zone(ATCADevice device, const uint8_t* config_data)
 {
-    ATCA_STATUS status = ATCA_GEN_FAIL;
+    ATCA_STATUS status;
     size_t config_size = 0;
 
     if (config_data == NULL)
@@ -378,8 +385,7 @@ ATCA_STATUS calib_write_config_zone(ATCADevice device, const uint8_t* config_dat
             (void)ATCA_TRACE(status, "calib_updateextra - failed");
             break;
         }
-    }
-    while (false);
+    } while (false);
 
     return status;
 }
@@ -407,7 +413,7 @@ ATCA_STATUS calib_write_config_zone(ATCADevice device, const uint8_t* config_dat
  */
 ATCA_STATUS calib_write_bytes_zone(ATCADevice device, uint8_t zone, uint16_t slot, size_t offset_bytes, const uint8_t *data, size_t length)
 {
-    ATCA_STATUS status = ATCA_GEN_FAIL;
+    ATCA_STATUS status;
     size_t zone_size = 0;
     size_t data_idx = 0;
     size_t cur_block = 0;
@@ -482,8 +488,7 @@ ATCA_STATUS calib_write_bytes_zone(ATCADevice device, uint8_t zone, uint16_t slo
                 }
             }
         }
-    }
-    while (false);
+    } while (false);
 
     return status;
 }
@@ -506,7 +511,7 @@ ATCA_STATUS calib_write_config_counter(ATCADevice device, uint16_t counter_id, u
     uint16_t lin_a, lin_b, bin_a, bin_b;
     uint8_t bytes[8];
     uint8_t idx = 0;
-    ATCA_STATUS status = ATCA_GEN_FAIL;
+    ATCA_STATUS status;
 
     if (counter_id > 1u || counter_value > COUNTER_MAX_VALUE)
     {
@@ -514,7 +519,13 @@ ATCA_STATUS calib_write_config_counter(ATCADevice device, uint16_t counter_id, u
     }
 
     /* coverity[misra_c_2012_rule_12_2_violation] Shifting more than 15 bits doesnot harm the functonality */
+    /* coverity[misra_c_2012_rule_10_1_violation:FALSE] Ensures proper promotion/demotion without overflow in shift operations */
+    /* coverity[misra_c_2012_rule_10_4_violation:FALSE] The result is masked with `UINT16_MAX` to constrain to the expected range */
+    /* coverity[misra_c_2012_rule_10_7_violation:SUPPRESS] All shifts and modulus operations are explicit and side-effect free */
     lin_a = (uint16_t)((0xFFFFu >> (counter_value % 32u)) & UINT16_MAX);
+    /* coverity[misra_c_2012_rule_10_1_violation:FALSE] Ensures proper promotion/demotion without overflow in shift operations */
+    /* coverity[misra_c_2012_rule_10_4_violation:FALSE] The result is masked with `UINT16_MAX` to constrain to the expected range */
+    /* coverity[misra_c_2012_rule_10_7_violation:SUPPRESS] All shifts and modulus operations are explicit and side-effect free */
     lin_b = (uint16_t)((0xFFFFu >> ((counter_value >= 16u) ? (counter_value - 16u) % 32u : 0u)) & UINT16_MAX);
     bin_a = (uint16_t)(counter_value / 32u);
     bin_b = (counter_value >= 16u) ? ((uint16_t)((counter_value - 16u) / 32u)) : 0u;
@@ -553,11 +564,17 @@ ATCA_STATUS calib_ca2_write(ATCADevice device, uint8_t zone, uint16_t address, c
                             const uint8_t *mac)
 {
     ATCA_STATUS status = ATCA_SUCCESS;
-    ATCAPacket packet;
+    ATCAPacket * packet = NULL;
     uint8_t write_zone = (zone == ATCA_ZONE_CONFIG) ? ATCA_ZONE_CA2_CONFIG : ATCA_ZONE_CA2_DATA;
     bool require_mac = false;
 
-    if ((NULL == device) || (NULL == value))
+#if ATCA_CHECK_PARAMS_EN
+    if (NULL == device)
+    {
+        status = ATCA_TRACE(ATCA_BAD_PARAM, "NULL pointer encountered");
+    }
+#endif
+    if (NULL == value)
     {
         status = ATCA_TRACE(ATCA_BAD_PARAM, "NULL pointer encountered");
     }
@@ -586,23 +603,32 @@ ATCA_STATUS calib_ca2_write(ATCADevice device, uint8_t zone, uint16_t address, c
     }
     #endif
 
+    packet = calib_packet_alloc();
+    if(NULL == packet)
+    {
+        (void)ATCA_TRACE(ATCA_ALLOC_FAILURE, "calib_packet_alloc - failed");
+        return ATCA_ALLOC_FAILURE;
+    }
+
+    (void)memset(packet, 0x00, sizeof(ATCAPacket));
+
     if (ATCA_SUCCESS == status)
     {
-        packet.param1 = write_zone;
-        packet.param2 = address;
+        packet->param1 = write_zone;
+        packet->param2 = address;
 
         if (ATCA_ZONE_CA2_CONFIG == write_zone)
         {
-            (void)memcpy(packet.data, value, 16);
+            (void)memcpy(packet->data, value, 16);
         }
         if (ATCA_ZONE_CA2_DATA == write_zone)
         {
-            (void)memcpy(packet.data, value, ATCA_BLOCK_SIZE);
+            (void)memcpy(packet->data, value, ATCA_BLOCK_SIZE);
         }
 
         if ((NULL != mac) && (ATCA_ZONE_CA2_DATA == write_zone))
         {
-            (void)memcpy(&packet.data[ATCA_BLOCK_SIZE], mac, MAC_SIZE);
+            (void)memcpy(&packet->data[ATCA_BLOCK_SIZE], mac, MAC_SIZE);
         }
 
         if ((NULL != mac) && (ATCA_ZONE_CA2_DATA == write_zone))
@@ -610,17 +636,18 @@ ATCA_STATUS calib_ca2_write(ATCADevice device, uint8_t zone, uint16_t address, c
             require_mac = true;
         }
 
-        (void)atWrite(atcab_get_device_type_ext(device), &packet, require_mac);
+        (void)atWrite(atcab_get_device_type_ext(device), packet, require_mac);
     }
 
     if (ATCA_SUCCESS == status)
     {
-        if (ATCA_SUCCESS != (status = atca_execute_command(&packet, device)))
+        if (ATCA_SUCCESS != (status = atca_execute_command(packet, device)))
         {
             (void)ATCA_TRACE(status, "calib_ca2_write - execution failed");
         }
     }
 
+    calib_packet_free(packet);
     return status;
 
 }
@@ -645,8 +672,13 @@ ATCA_STATUS calib_ca2_write_zone(ATCADevice device, uint8_t zone, uint16_t slot,
     uint16_t addr;
 
     ((void)offset);
-
-    if ((NULL == device) && (NULL == data))
+#if ATCA_CHECK_PARAMS_EN
+    if (NULL == device)
+    {
+        status = ATCA_TRACE(ATCA_BAD_PARAM, "NULL pointer encountered");
+    }
+#endif
+    if (NULL == data)
     {
         status = ATCA_TRACE(ATCA_BAD_PARAM, "NULL pointer encountered");
     }
@@ -683,12 +715,16 @@ ATCA_STATUS calib_ca2_write_config_zone(ATCADevice device, const uint8_t* config
 {
     ATCA_STATUS status = ATCA_SUCCESS;
     uint8_t slot = 1;
-
-    if ((NULL == device) || (NULL == config_data))
+#if ATCA_CHECK_PARAMS_EN
+    if (NULL == device)
     {
         status = ATCA_TRACE(ATCA_BAD_PARAM, "NULL pointer encountered");
     }
-
+#endif
+    if (NULL == config_data)
+    {
+        status = ATCA_TRACE(ATCA_BAD_PARAM, "NULL pointer encountered");
+    }
     if (ATCA_SUCCESS == status)
     {
         while (slot <= 3u)
@@ -722,7 +758,7 @@ ATCA_STATUS calib_ca2_write_config_counter(ATCADevice device, uint8_t counter_id
     uint16_t bin_a, bin_b;
     uint64_t lin_a, lin_b;
     uint8_t bytes[16];
-    ATCA_STATUS status = ATCA_GEN_FAIL;
+    ATCA_STATUS status;
 
     if (counter_id != 0u || counter_value > COUNTER_MAX_VALUE_CA2)
     {
@@ -780,11 +816,16 @@ ATCA_STATUS calib_ca2_write_enc(ATCADevice device, uint16_t slot, uint8_t* data,
     uint8_t mac[WRITE_MAC_SIZE] = { 0 };
     uint16_t addr;
 
-    if ((NULL == data) || (NULL == transport_key))
+#if ATCA_CHECK_PARAMS_EN
+    if (NULL == data)
     {
         return ATCA_TRACE(ATCA_BAD_PARAM, "NULL pointer encounteed");
     }
-
+#endif
+    if (NULL == transport_key)
+    {
+        return ATCA_TRACE(ATCA_BAD_PARAM, "NULL pointer encounteed");
+    }
     do
     {
         // Read device serial number
@@ -858,8 +899,7 @@ ATCA_STATUS calib_ca2_write_enc(ATCADevice device, uint16_t slot, uint8_t* data,
         }
 
         status = calib_ca2_write(device, ATCA_ZONE_DATA, write_mac_param.key_id, write_mac_param.encrypted_data, write_mac_param.auth_mac);
-    }
-    while (false);
+    } while (false);
 
     return status;
 }
@@ -888,7 +928,13 @@ ATCA_STATUS calib_ca2_write_bytes_zone(ATCADevice device, uint8_t zone, uint16_t
     uint8_t data_set_size;
     int8_t no_of_sets;
 
-    if ((NULL == device) || (NULL == data))
+#if ATCA_CHECK_PARAMS_EN
+    if (NULL == device)
+    {
+        return ATCA_TRACE(ATCA_BAD_PARAM, "Encountered NULL pointer");
+    }
+#endif
+    if (NULL == data)
     {
         return ATCA_TRACE(ATCA_BAD_PARAM, "Encountered NULL pointer");
     }
@@ -896,6 +942,7 @@ ATCA_STATUS calib_ca2_write_bytes_zone(ATCADevice device, uint8_t zone, uint16_t
     {
         return ATCA_TRACE(ATCA_BAD_PARAM, "Invalid zone parameter received");
     }
+
     if ((ATCA_ZONE_DATA == zone) && (
             // Only Slot 1-3 are valid for data zone write
             ((SHA105 != device->mIface.mIfaceCFG->devtype) && (slot == 0u)) || (slot > 3u) ||
@@ -1084,7 +1131,8 @@ ATCA_STATUS calib_write_pubkey(ATCADevice device, uint16_t slot, const uint8_t *
     // the data zone is unlocked
     for (block = 0u; block < 3u; block++)
     {
-        if (ATCA_SUCCESS != (status = calib_write_zone_ext(device, ATCA_ZONE_DATA, slot, block, 0, &public_key_formatted[ATCA_BLOCK_SIZE * block], ATCA_BLOCK_SIZE)))
+        if (ATCA_SUCCESS != (status = calib_write_zone_ext(device, ATCA_ZONE_DATA, slot, block, 0, 
+                                                           &public_key_formatted[ATCA_BLOCK_SIZE * block], ATCA_BLOCK_SIZE)))
         {
             (void)ATCA_TRACE(status, "calib_write_zone - failed");
             break;

@@ -1,7 +1,13 @@
 /**
  * \file
+ * \brief Defines packet allocation functions
  *
- * \copyright (c) 2015-2020 Microchip Technology Inc. and its subsidiaries.
+ * The APIs are used for allocating packets in heap or bss according to 
+ * atcab heap availability. Corresponding memory free is done
+ *
+ * This supports the ATECC device family.
+ *
+ * \copyright (c) 2024 Microchip Technology Inc. and its subsidiaries.
  *
  * \page License
  *
@@ -24,32 +30,30 @@
  * THIS SOFTWARE.
  */
 
-#include "atca_test.h"
-#ifndef DO_NOT_TEST_CERT
 
-#ifdef __GNUC__
-// Unity macros trigger this warning
-#pragma GCC diagnostic ignored "-Wnested-externs"
+#ifndef CALIB_PACKET_H
+#define CALIB_PACKET_H
+
+#include "calib_command.h"
+#include "atca_device.h"
+#include "atca_config.h"
+
+#ifdef __cplusplus
+extern "C" {
 #endif
 
-TEST_GROUP_RUNNER(atcacert_client)
+typedef struct calib_packet_cache_s
 {
-    // Load certificate data onto the device
-    RUN_TEST_CASE(atcacert_client, init);
+    ATCAPacket packet_pool;
+    bool used;
+}calib_packet_cache_t;
 
-    RUN_TEST_CASE(atcacert_client, atcacert_read_device_loc_gen_key);
-    RUN_TEST_CASE(atcacert_client, atcacert_read_device_loc_gen_key_partial);
-    RUN_TEST_CASE(atcacert_client, atcacert_read_device_loc_data_partial);
+ATCAPacket* calib_packet_alloc(void);
 
-    RUN_TEST_CASE(atcacert_client, atcacert_read_cert_signer);
-    RUN_TEST_CASE(atcacert_client, atcacert_read_cert_device);
-    RUN_TEST_CASE(atcacert_client, atcacert_read_subj_key_id);
-    RUN_TEST_CASE(atcacert_client, atcacert_read_cert_small_buf);
-    RUN_TEST_CASE(atcacert_client, atcacert_read_cert_bad_params);
-    RUN_TEST_CASE(atcacert_client, atcacert_generate_device_csr);
-    RUN_TEST_CASE(atcacert_client, atcacert_generate_device_csr_pem);
+void calib_packet_free(ATCAPacket* packet);
 
-    RUN_TEST_CASE(atcacert_client, atcacert_get_response);
-    RUN_TEST_CASE(atcacert_client, atcacert_get_response_bad_params);
+#ifdef __cplusplus
 }
 #endif
+
+#endif /* CALIB_PACKET_H */

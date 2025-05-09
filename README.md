@@ -6,11 +6,15 @@ Introduction
 This library implements the APIs required to communicate with Microchip Security
 device. The family of devices supported currently are:
 
-- [ATSHA204A](http://www.microchip.com/ATSHA204A)
-- [ATECC108A](http://www.microchip.com/ATECC108A)
-- [ATECC508A](http://www.microchip.com/ATECC508A)
-- [ATECC608A](http://www.microchip.com/ATECC608A)
-- [ATECC608B](http://www.microchip.com/ATECC608B)
+|CryptoAuth                                      |CryptoAuth2                               |
+|-----------------------------------------------:|:-----------------------------------------|
+|[ATECC608C](https://www.microchip.com/ATECC608C)|[ECC204](https://www.microchip.com/ECC204)|
+|[ATECC608B](https://www.microchip.com/ATECC608B)|[ECC206](https://www.microchip.com/ECC206)|
+|[ATECC608A](http://www.microchip.com/ATECC608A) |[SHA104](https://www.microchip.com/SHA104)|
+|[ATECC508A](http://www.microchip.com/ATECC508A) |[SHA105](https://www.microchip.com/SHA105)|
+|[ATECC108A](http://www.microchip.com/ATECC108A) |[SHA106](https://www.microchip.com/SHA106)|
+|[ATSHA204A](http://www.microchip.com/ATSHA204A) |[RNG90](https://www.microchip.com/RNG90)  |
+|[ATSHA206A](https://www.microchip.com/ATSHA206A)|                                          |
 
 The best place to start is with the [Microchip Trust Platform](https://www.microchip.com/design-centers/security-ics/trust-platform)
 
@@ -27,9 +31,12 @@ Prerequisite hardware to run CryptoAuthLib examples:
 Alternatively a Microchip MCU and Adapter Board:
   - [ATSAMR21 Xplained Pro]( http://www.microchip.com/atsamr21-xpro )
     or [ATSAMD21 Xplained Pro]( http://www.microchip.com/ATSAMD21-XPRO )
-  - [CryptoAuth Xplained Pro Extension](http://www.microchip.com/developmenttools/productdetails.aspx?partno=atcryptoauth-xpro-b )
-    or [CryptoAuthentication SOIC Socket Board](http://www.microchip.com/developmenttools/productdetails.aspx?partno=at88ckscktsoic-xpro )
+  - [CryptoAuthentication SOIC Socket Board](http://www.microchip.com/developmenttools/productdetails.aspx?partno=at88ckscktsoic-xpro )
     to accept SOIC parts
+  - [ATECC608B mikroBUS evaluation board](https://www.microchip.com/en-us/development-tool/DT100104)
+  - [ECC204 mikroBUS evaluation board](https://www.microchip.com/en-us/development-tool/ev92r58a)
+  - [SHA104/SHA105 mikroBUS evaluation board](https://www.microchip.com/en-us/development-tool/ev97m19a)
+  - [TA010 mikroBUS evaluation board](https://www.microchip.com/en-us/development-tool/EV74C12A)
 
 For most development, using socketed top-boards is preferable until your
 configuration is well tested, then you can commit it to a CryptoAuth Xplained
@@ -40,14 +47,8 @@ not be changeable.
 Examples
 -----------
 
-  - Watch [CryptoAuthLib Documents](http://www.microchip.com/design-centers/security-ics/cryptoauthentication/overview )
-    for new examples coming online.
-  - Node Authentication Example Using Asymmetric PKI is a complete, all-in-one
-    example demonstrating all the stages of crypto authentication starting from
-    provisioning the Crypto Authentication device ATECC608/ATECC508A with keys
-    and certificates to demonstrating an authentication sequence using
-    asymmetric techniques.
-    http://www.microchip.com/SWLibraryWeb/product.aspx?product=CryptoAuthLib
+  - Install the [Trust Platform Design Suite](https://www.microchip.com/en-us/products/security/trust-platform ) to access Use Case examples 
+    for the different Security Solutions (ATECC608, SHA104/105, ECC204, TA010, TA100…)
 
 Configuration
 -----------
@@ -131,7 +132,7 @@ Directory Structure
 lib - primary library source code
 lib/atcacert - certificate data and i/o methods
 lib/calib - the Basic Cryptoauth API
-lib/crypto - Software crypto implementations external crypto libraries support (primarily SHA1 and SHA256)
+lib/crypto - Software crypto implementations external crypto libraries support (primarily SHA1 and SHA2)
 lib/hal - hardware abstraction layer code for supporting specific platforms
 lib/host - support functions for common host-side calculations
 lib/jwt - json web token functions

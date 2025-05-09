@@ -41,22 +41,27 @@
 #include "api_calib/test_calib.h"
 #endif
 
-#if ATCA_CA_SUPPORT && !defined(DO_NOT_TEST_CERT)
+#ifndef DO_NOT_TEST_CERT
 #include "atcacert/test_atcacert.h"
 #endif
 
-#if ATCA_TA_SUPPORT
+#if ATCA_TA_SUPPORT && !LIBRARY_USAGE_EN_CHECK
 #include "api_talib/test_talib.h"
 #endif
-
-/* Common API Testing - atcab_ is the classic Cryptoauthlib API */
-#include "api_atcab/test_atcab.h"
 
 /* Host side Cryptographic API Testing */
 #include "api_crypto/test_crypto.h"
 
+#ifndef LIBRARY_USAGE_EN
+/* Common API Testing - atcab_ is the classic Cryptoauthlib API */
+#include "api_atcab/test_atcab.h"
+
 /* Library Integration Tests - Tests to ensure the library accesses device properly*/
 #include "integration/test_integration.h"
+
+/* Hal layer testing */
+#include "hal/test_hal.h"
+#endif
 
 /* JWT Support */
 #include "jwt/test_jwt.h"
@@ -66,7 +71,6 @@ static int help(int argc, char* argv[]);
 #if defined(_WIN32) || defined(__linux__) || defined(__APPLE__)
 static int call_exit(int argc, char* argv[]);
 #endif
-
 
 // *INDENT-OFF*  - Preserve formatting
 static t_menu_info mas_menu_info[] =
@@ -102,10 +106,16 @@ static t_menu_info mas_menu_info[] =
 #ifdef ATCA_TA100_SUPPORT
     { "ta100",    "Set Target Device to TA100",                     select_device                        },
 #endif
+#ifdef ATCA_TA101_SUPPORT
+    { "ta101",    "Set Target Device to TA101",                     select_device                        },
+#endif
+#ifndef LIBRARY_USAGE_EN
     { "info",     "Get the Chip Revision",                          info                                 },
     { "sernum",   "Get the Chip Serial Number",                     read_sernum                          },
-    { "rand",     "Generate Some Random Numbers",                   do_randoms                           },
     { "readcfg",  "Read the Config Zone",                           read_config                          },
+    { "hal",      "Tests hal drivers functionality",                hal_tests                            },
+#endif
+    { "rand",     "Generate Some Random Numbers",                   do_randoms                           },
     { "lockstat", "Zone Lock Status",                               lock_status                          },
 #ifdef ATCA_TEST_LOCK_ENABLE
     { "lockcfg",  "Lock the Config Zone",                           lock_config                          },

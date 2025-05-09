@@ -58,7 +58,7 @@ static void hex_to_data(const char* hex_str, uint8_t* data, size_t data_size)
     }
 }
 
-static char line[16384];
+static char line[25608];
 
 ATCA_STATUS read_rsp_match_value(FILE* file, const char* name, const char* match)
 {
@@ -490,30 +490,6 @@ ATCA_STATUS load_sha_vector(sha_vector ** vector, size_t digest_size)
     return status;
 }
 
-ATCA_STATUS load_aes_gcm_vector(aes_gcm_vector ** vector)
-{
-    ATCA_STATUS status = ATCA_BAD_PARAM;
-    aes_gcm_vector * v = NULL;
-
-    do
-    {
-        int len_bits = 0;
-        size_t len = 0;
-
-
-
-    }
-    while (false);
-
-
-// [Keylen = 128]
-// [IVlen = 96]
-// [PTlen = 0]
-// [AADlen = 128]
-// [Taglen = 128]
-    return status;
-}
-
 typedef struct
 {
     /* Expected to be 0x03 or 0x10001*/
@@ -530,7 +506,6 @@ ATCA_STATUS load_rsa_vector(rsa_vector ** vector, size_t mod, char * hash_alg)
 
     do
     {
-        int len_bits = 0;
         size_t len = mod / 8;
 
         if (NULL == g_rsp_file || NULL == vector)

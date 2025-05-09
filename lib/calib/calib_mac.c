@@ -52,8 +52,8 @@
  */
 ATCA_STATUS calib_mac(ATCADevice device, uint8_t mode, uint16_t key_id, const uint8_t* challenge, uint8_t* digest)
 {
-    ATCAPacket packet;
-    ATCA_STATUS status = ATCA_GEN_FAIL;
+    ATCAPacket * packet = NULL;
+    ATCA_STATUS status;
 
     do
     {
@@ -63,9 +63,19 @@ ATCA_STATUS calib_mac(ATCADevice device, uint8_t mode, uint16_t key_id, const ui
             break;
         }
 
+        packet = calib_packet_alloc();
+        if(NULL == packet)
+        {
+            (void)ATCA_TRACE(ATCA_ALLOC_FAILURE, "calib_packet_alloc - failed");
+            status = ATCA_ALLOC_FAILURE;
+            break;
+        }
+
+        (void)memset(packet, 0x00, sizeof(ATCAPacket));
+
         // build mac command
-        packet.param1 = mode;
-        packet.param2 = key_id;
+        packet->param1 = mode;
+        packet->param2 = key_id;
         if ((mode & MAC_MODE_BLOCK2_TEMPKEY) != MAC_MODE_BLOCK2_TEMPKEY)
         {
             if (challenge == NULL)
@@ -77,26 +87,26 @@ ATCA_STATUS calib_mac(ATCADevice device, uint8_t mode, uint16_t key_id, const ui
             #error "CA_MAX_PACKET_SIZE cannot accomodate mac command with challenge"
             #endif
 
-            (void)memcpy(&packet.data[0], challenge, 32);  // a 32-byte challenge
+            (void)memcpy(&packet->data[0], challenge, 32);  // a 32-byte challenge
         }
 
-        if ((status = atMAC(atcab_get_device_type_ext(device), &packet)) != ATCA_SUCCESS)
+        if ((status = atMAC(atcab_get_device_type_ext(device), packet)) != ATCA_SUCCESS)
         {
             (void)ATCA_TRACE(status, "atMAC - failed");
             break;
         }
 
-        if ((status = atca_execute_command(&packet, device)) != ATCA_SUCCESS)
+        if ((status = atca_execute_command(packet, device)) != ATCA_SUCCESS)
         {
             (void)ATCA_TRACE(status, "calib_mac - execution failed");
             break;
         }
 
-        (void)memcpy(digest, &packet.data[ATCA_RSP_DATA_IDX], MAC_SIZE);
+        (void)memcpy(digest, &packet->data[ATCA_RSP_DATA_IDX], MAC_SIZE);
 
-    }
-    while (false);
+    } while (false);
 
+    calib_packet_free(packet);
     return status;
 }
 #endif  /* CALIB_MAC_EN */

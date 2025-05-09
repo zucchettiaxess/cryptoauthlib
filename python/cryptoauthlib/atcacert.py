@@ -24,7 +24,7 @@ ATCACERT: classes and functions for interacting with compressed certificates
 import binascii
 from datetime import datetime
 from ctypes import Structure, c_int, c_uint8, c_uint16, c_char, c_uint32, c_uint64, POINTER, create_string_buffer, byref, c_size_t
-from .library import get_cryptoauthlib, AtcaReference, AtcaStructure
+from .library import get_cryptoauthlib, AtcaReference, AtcaStructure, cal_buffer
 from .atcaenum import AtcaEnum
 from .status import Status
 
@@ -38,6 +38,7 @@ class atcacert_cert_type_t(AtcaEnum):
     """
     CERTTYPE_X509 = 0       # Standard X509 certificate
     CERTTYPE_CUSTOM = 1     # Custom format
+    CERTTYPE_X509_FULL_STORED = 2  # Full Stored X509 Certificate
 
 
 class atcacert_cert_sn_src_t(AtcaEnum):
@@ -77,6 +78,8 @@ class atcacert_device_zone_t(AtcaEnum):
     DEVZONE_CONFIG = 0x00   # Configuration zone.
     DEVZONE_OTP = 0x01      # One Time Programmable zone.
     DEVZONE_DATA = 0x02     # Data zone (slots).
+    DEVZONE_GENKEY = 0x03   # Data zone - Generate Pubkey (slots).
+    DEVZONE_DEDICATED_DATA = 0x04  # Dedicated data zone.
     DEVZONE_NONE = 0x07     # Special value used to indicate there is no device location.
 
 
@@ -206,7 +209,7 @@ class atcacert_device_loc_t(AtcaStructure):
     _pack_ = 1
     _def_ = {
         'zone': (atcacert_device_zone_t,),  # Zone in the device.
-        'slot': (c_uint8,),  # Slot within the data zone. Only applies if zone is DEVZONE_DATA.
+        'slot': (c_uint16,),  # Slot within the data zone. Only applies if zone is DEVZONE_DATA.
         'is_genkey': (c_uint8,),  # If true, use GenKey command to get the contents instead of Read.
         'offset': (c_uint16,),  # Byte offset in the zone.
         'count': (c_uint16,)  # Byte count.
@@ -248,12 +251,16 @@ class atcacert_def_t(AtcaStructure):
 atcacert_def_t._def_ = {  # pylint: disable=protected-access
     # Certificate type.
     'type': (atcacert_cert_type_t,),
+    # Where on the device the compressed cert can be found.
+    'comp_cert_dev_loc': (atcacert_device_loc_t,),
+    # If this is a device certificate template, this is the device slot for the device private key.
+    'private_key_slot': (c_uint16,),
     # ID for the this certificate definition (4-bit value).
     'template_id': (c_uint8,),
     # ID for the certificate chain this definition is a part of (4-bit value).
     'chain_id': (c_uint8,),
-    # If this is a device certificate template, this is the device slot for the device private key.
-    'private_key_slot': (c_uint8,),
+    # Standard signature size of the certificate keytype.
+    'std_sig_size': (c_uint16,),
     # Where the certificate serial number comes from (4-bit value).
     'sn_source': (atcacert_cert_sn_src_t,),
     # Only applies when sn_source is SNSRC_STORED or SNSRC_STORED_DYNAMIC. Describes where to get the
@@ -269,8 +276,6 @@ atcacert_def_t._def_ = {  # pylint: disable=protected-access
     'expire_years': (c_uint8,),
     # Where on the device the public key can be found.
     'public_key_dev_loc': (atcacert_device_loc_t,),
-    # Where on the device the compressed cert can be found.
-    'comp_cert_dev_loc': (atcacert_device_loc_t,),
     # Where in the certificate template the standard cert elements are inserted.
     'std_cert_elements': (atcacert_cert_loc_t, atcacert_std_cert_element_t),
     # Additional certificate elements outside of the standard certificate contents.
@@ -373,12 +378,14 @@ def atcacert_get_response(device_private_key_slot, challenge, response):
     Returns:
         ATCACERT_E_SUCCESS on success, otherwise an error code.
     """
-    if not isinstance(response, bytearray):
+    if not isinstance(challenge, bytearray) or not isinstance(response, bytearray):
         status = Status.ATCA_BAD_PARAM
     else:
-        c_response = create_string_buffer(64)
-        status = get_cryptoauthlib().atcacert_get_response(device_private_key_slot, bytes(challenge), byref(c_response))
-        response[0:] = bytes(c_response.raw)
+        c_challenge = cal_buffer(len(challenge), challenge)
+        c_response = bytes(64)
+        c_response_buf = cal_buffer(len(c_response), c_response)
+        status = get_cryptoauthlib().atcacert_get_response(device_private_key_slot, byref(c_challenge), byref(c_response_buf))
+        response[0:] = c_response[:c_response_buf.len]
     return status
 
 
@@ -412,7 +419,8 @@ def atcacert_read_cert(cert_def, ca_public_key, cert, cert_size):
     else:
         c_cert_size = c_uint32(cert_size.value)
         c_cert = create_string_buffer(cert_size.value)
-        status = get_cryptoauthlib().atcacert_read_cert(byref(cert_def), bytes(ca_public_key), byref(c_cert),
+        ca_public_key_buf = cal_buffer(len(ca_public_key), ca_public_key)
+        status = get_cryptoauthlib().atcacert_read_cert(byref(cert_def), byref(ca_public_key_buf), byref(c_cert),
                                                         byref(c_cert_size))
         cert[:] = bytes(c_cert.raw)[0:c_cert_size.value]
         cert_size.value = c_cert_size.value

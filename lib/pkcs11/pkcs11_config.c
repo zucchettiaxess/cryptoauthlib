@@ -56,6 +56,63 @@ typedef struct pkcs11_conf_filedata_s
 
 typedef struct pkcs11_conf_filedata_s *pkcs11_conf_filedata_ptr;
 
+#if ATCA_TA_SUPPORT
+void pkcs11_config_set_key_size(pkcs11_object_ptr pObject)
+{
+    CK_BYTE key_type = ((pObject->handle_info.element_CKA & TA_HANDLE_INFO_KEY_TYPE_MASK) >> TA_HANDLE_INFO_KEY_TYPE_SHIFT);
+    CK_ULONG private_key_size = 0u;
+    CK_ULONG public_key_size = 0u;
+
+    switch (key_type)
+    {
+        case TA_KEY_TYPE_ECCP224:
+            pObject->class_type = CKK_EC;
+            private_key_size = TA_ECC224_PVT_KEY_SIZE;
+            public_key_size = TA_ECC224_PUB_KEY_SIZE;
+            break;
+        case TA_KEY_TYPE_ECCP384:
+            pObject->class_type = CKK_EC;
+            private_key_size = TA_ECC384_PVT_KEY_SIZE;
+            public_key_size = TA_ECC384_PUB_KEY_SIZE;
+            break;
+        case TA_KEY_TYPE_ECCP521:
+            pObject->class_type = CKK_EC;
+            private_key_size = TA_ECC521_PVT_KEY_SIZE;
+            public_key_size = TA_ECC521_PUB_KEY_SIZE;
+            break;
+#if PKCS11_RSA_SUPPORT_ENABLE
+        case TA_KEY_TYPE_RSA1024:
+            pObject->class_type = CKK_RSA;
+            private_key_size = TA_RSAENC_PVT_KEY_SIZE1024;
+            public_key_size = TA_RSAENC_PUB_KEY_SIZE1024;
+            break;
+        case TA_KEY_TYPE_RSA2048:
+            pObject->class_type = CKK_RSA;
+            private_key_size = TA_RSAENC_PVT_KEY_SIZE2048;
+            public_key_size = TA_RSAENC_PUB_KEY_SIZE2048;
+            break;
+        case TA_KEY_TYPE_RSA3072:
+            pObject->class_type = CKK_RSA;
+            private_key_size = TA_RSAENC_PVT_KEY_SIZE3072;
+            public_key_size = TA_RSAENC_PUB_KEY_SIZE3072;
+            break;
+        case TA_KEY_TYPE_RSA4096:
+            pObject->class_type = CKK_RSA;
+            private_key_size = TA_RSAENC_PVT_KEY_SIZE4096;
+            public_key_size = TA_RSAENC_PUB_KEY_SIZE4096;
+            break;
+#endif
+        default:
+            pObject->class_type = CKK_EC;
+            private_key_size = TA_ECC256_PVT_KEY_SIZE;
+            public_key_size = TA_ECC256_PUB_KEY_SIZE;
+            break;
+    }
+
+    pObject->size = (CKO_PRIVATE_KEY == pObject->class_id) ? (private_key_size) : (public_key_size);
+}
+#endif
+
 void pkcs11_config_init_private(pkcs11_object_ptr pObject, const char * label, size_t len)
 {
     if (len >= (size_t)PKCS11_MAX_LABEL_SIZE)
@@ -65,13 +122,22 @@ void pkcs11_config_init_private(pkcs11_object_ptr pObject, const char * label, s
     (void)memcpy((char*)pObject->name, label, len);
     pObject->name[len] = (CK_UTF8CHAR)'\0';
     pObject->class_id = CKO_PRIVATE_KEY;
-    pObject->class_type = CKK_EC;
     pObject->attributes = pkcs11_key_private_attributes;
     pObject->count = pkcs11_key_private_attributes_count;
+    pObject->flags |= PKCS11_OBJECT_FLAG_KEY_CACHE;
 #if ATCA_CA_SUPPORT
     pObject->data = NULL;
 #endif
-    pObject->size = 16;
+    pObject->class_type = CKK_EC;
+    pObject->size = ATCA_ECCP256_PVTKEY_SIZE;
+
+#if ATCA_TA_SUPPORT
+    // Update the class type and size based on the keytype
+    if (0u != pObject->handle_info.element_CKA)
+    {
+        (void)pkcs11_config_set_key_size(pObject);
+    }
+#endif
 }
 
 void pkcs11_config_init_public(pkcs11_object_ptr pObject, const char * label, size_t len)
@@ -83,13 +149,22 @@ void pkcs11_config_init_public(pkcs11_object_ptr pObject, const char * label, si
     (void)memcpy((char*)pObject->name, label, len);
     pObject->name[len] = (CK_UTF8CHAR)'\0';
     pObject->class_id = CKO_PUBLIC_KEY;
-    pObject->class_type = CKK_EC;
     pObject->attributes = pkcs11_key_public_attributes;
     pObject->count = pkcs11_key_public_attributes_count;
+    pObject->flags |= PKCS11_OBJECT_FLAG_KEY_CACHE;
 #if ATCA_CA_SUPPORT
     pObject->data = NULL;
 #endif
-    pObject->size = 64;
+    pObject->class_type = CKK_EC;
+    pObject->size = ATCA_ECCP256_PVTKEY_SIZE;
+
+#if ATCA_TA_SUPPORT
+    // Update the class type and size based on the keytype
+    if (0u != pObject->handle_info.element_CKA)
+    {
+        (void)pkcs11_config_set_key_size(pObject);
+    }
+#endif
 }
 
 void pkcs11_config_init_secret(pkcs11_object_ptr pObject, const char * label, size_t len, size_t keylen)
@@ -122,7 +197,6 @@ void pkcs11_config_init_cert(pkcs11_object_ptr pObject, const char * label, size
     (void)memcpy((char*)pObject->name, label, len);
     pObject->name[len] = (CK_UTF8CHAR)'\0';
     pObject->class_id = CKO_CERTIFICATE;
-    pObject->class_type = 0;
     pObject->attributes = pkcs11_cert_x509public_attributes;
     pObject->count = pkcs11_cert_x509public_attributes_count;
 #if ATCA_CA_SUPPORT
@@ -156,11 +230,11 @@ void pkcs11_config_init_cert(pkcs11_object_ptr pObject, const char * label, size
 #define PKCS11_CONFIG_U32_MAX       0xFFFFFFFFL
 #endif
 
-static size_t pkcs11_config_load_file(FILE* fp, char ** buffer)
+static size_t pkcs11_config_load_file(FILE* fp, char ** buf)
 {
     size_t size = 0u;
 
-    if (NULL != buffer)
+    if (NULL != buf)
     {
         /* Get file size */
         (void)fseek(fp, 0L, SEEK_END);
@@ -177,14 +251,14 @@ static size_t pkcs11_config_load_file(FILE* fp, char ** buffer)
         if (0 < fsize)
         {
             size = (size_t)fsize;
-            *buffer = (char*)pkcs11_os_malloc(size);
-            if (NULL != *buffer)
+            *buf = (char*)pkcs11_os_malloc(size);
+            if (NULL != *buf)
             {
-                (void)memset(*buffer, 0, size);
-                if (size != fread(*buffer, 1, size, fp))
+                (void)memset(*buf, 0, size);
+                if (size != fread(*buf, 1, size, fp))
                 {
-                    pkcs11_os_free(*buffer);
-                    *buffer = NULL;
+                    pkcs11_os_free(*buf);
+                    *buf = NULL;
                     size = 0;
                 }
             }
@@ -332,6 +406,11 @@ static CK_RV pkcs11_config_parse_device(pkcs11_slot_ctx_ptr slot_ctx, char* cfgs
     else if (0 == strcmp(argv[0], "TA100"))
     {
         slot_ctx->interface_config.devtype = TA100;
+        rv = CKR_OK;
+    }
+    else if (0 == strcmp(argv[0], "TA101"))
+    {
+        slot_ctx->interface_config.devtype = TA101;
         rv = CKR_OK;
     }
     else
@@ -582,7 +661,7 @@ static CK_RV pkcs11_config_parse_freeslots(pkcs11_slot_ctx_ptr slot_ctx, char* c
             return CKR_GENERAL_ERROR;
         }
 
-        if (slot > 0 && slot < 16)
+        if (slot >= 0 && slot < 16)
         {
             slot_ctx->flags |= ((CK_FLAGS)1U << (uint16_t)slot);
         }
@@ -631,7 +710,6 @@ static CK_RV pkcs11_config_parse_object(pkcs11_slot_ctx_ptr slot_ctx, char* cfgs
         {
             pkcs11_config_init_private(pObject, argv[1], strlen(argv[1]));
             pObject->slot = slot;
-            pObject->flags = 0;
 #if ATCA_CA_SUPPORT
             pObject->config = &slot_ctx->cfg_zone;
 #endif
@@ -646,7 +724,6 @@ static CK_RV pkcs11_config_parse_object(pkcs11_slot_ctx_ptr slot_ctx, char* cfgs
         {
             pkcs11_config_init_public(pPubkey, argv[1], strlen(argv[1]));
             pPubkey->slot = slot;
-            pPubkey->flags = 0;
 #if ATCA_CA_SUPPORT
             pPubkey->config = &slot_ctx->cfg_zone;
 #endif
@@ -674,7 +751,6 @@ static CK_RV pkcs11_config_parse_object(pkcs11_slot_ctx_ptr slot_ctx, char* cfgs
                 pObject->slot = (uint16_t)l_tmp;
             }
 
-            pObject->flags = 0;
 #if ATCA_CA_SUPPORT
             pObject->config = &slot_ctx->cfg_zone;
 #endif
@@ -744,9 +820,6 @@ static CK_RV pkcs11_config_parse_object(pkcs11_slot_ctx_ptr slot_ctx, char* cfgs
             pObject->attributes = pkcs11_cert_x509public_attributes;
             pObject->count = pkcs11_cert_x509public_attributes_count;
 
-            /* Load certificate data from the file system */
-//            pObject->size = g_cert_def_2_device.cert_template_size;
-//            pObject->data = &g_cert_def_2_device;
             pObject->flags = 0;
 #if ATCA_CA_SUPPORT
             pObject->config = &slot_ctx->cfg_zone;
@@ -888,9 +961,10 @@ CK_RV pkcs11_config_cert(pkcs11_lib_ctx_ptr pLibCtx, pkcs11_slot_ctx_ptr pSlot, 
 
 CK_RV pkcs11_config_key(pkcs11_lib_ctx_ptr pLibCtx, pkcs11_slot_ctx_ptr pSlot, pkcs11_object_ptr pObject, CK_ATTRIBUTE_PTR pLabel)
 {
-    FILE* fp;
     const char *objtype = "";
     char filename[200];
+    char child_config_data[200];
+    FILE* configfile = NULL;
     CK_RV rv = CKR_FUNCTION_FAILED;
     uint16_t handle = UINT16_MAX;
 
@@ -898,7 +972,6 @@ CK_RV pkcs11_config_key(pkcs11_lib_ctx_ptr pLibCtx, pkcs11_slot_ctx_ptr pSlot, p
     {
 #if ATCA_CA_SUPPORT
         uint8_t i = 0;
-
         /* Find a free slot that matches the object type */
         for (i = 0; i < 16u; i++)
         {
@@ -942,7 +1015,7 @@ CK_RV pkcs11_config_key(pkcs11_lib_ctx_ptr pLibCtx, pkcs11_slot_ctx_ptr pSlot, p
     }
     else
     {
-#if ATCA_TA_SUPPORT
+#if ATCA_TA_SUPPORT && TALIB_CREATE_SHARED_DATA_EN
         ATCA_STATUS status = talib_create_element(pSlot->device_ctx, &pObject->handle_info, &handle);
         rv = pkcs11_util_convert_rv(status);
 #endif
@@ -959,7 +1032,6 @@ CK_RV pkcs11_config_key(pkcs11_lib_ctx_ptr pLibCtx, pkcs11_slot_ctx_ptr pSlot, p
             pObject->config = &pSlot->cfg_zone;
         }
 #endif
-
         if (CKO_PRIVATE_KEY == pObject->class_id)
         {
             pkcs11_config_init_private(pObject, (char*)pLabel->pValue, pLabel->ulValueLen);
@@ -980,24 +1052,32 @@ CK_RV pkcs11_config_key(pkcs11_lib_ctx_ptr pLibCtx, pkcs11_slot_ctx_ptr pSlot, p
             /* Unsupported class_id */
         }
 
-        int ret = snprintf(filename, sizeof(filename), "%s%lu.%u.conf", pLibCtx->config_path,
+        int ret = 0x00;
+        if (atcab_is_ca_device(pSlot->interface_config.devtype))
+        {
+#if ATCA_CA_SUPPORT
+            ret = snprintf(filename, sizeof(filename), "%s%lu.%u.conf", pLibCtx->config_path,
                            pSlot->slot_id, pObject->slot);
+#endif
+        }
+        else
+        {
+            ret = snprintf(filename, sizeof(filename), "%s%lu.%04x.conf", pLibCtx->config_path,
+                           pSlot->slot_id, pObject->slot);
+        }
 
         if (ret > 0 && ret < (int)sizeof(filename))
         {
             /* coverity[cert_fio32_c_violation] files are created in pLibCtx->config_path which has already been validated as a proper device*/
             /* coverity[misra_c_2012_rule_10_1_violation] Macro usage is valid per POSIX specification*/
-            int fd = open(filename, O_CREAT | O_EXCL | O_WRONLY, 0755);
-            if (-1 != fd)
+            configfile = fopen(filename, "w");
+            if (NULL != configfile)
             {
-                fp = fdopen(fd, "wb");
-                if (NULL != fp)
-                {
-                    (void)fprintf(fp, "type = %s\n", objtype);
-                    (void)fprintf(fp, "label = %s\n", pObject->name);
-                    (void)fclose(fp);
-                    rv = CKR_OK;
-                }
+                (void)snprintf(child_config_data, sizeof(child_config_data), "%s,%s,0x%04x", objtype, pObject->name, pObject->slot);
+
+                (void)fprintf(configfile, "type = %s\n", child_config_data);
+                (void)fclose(configfile);
+                rv = CKR_OK;
             }
         }
     }
@@ -1008,16 +1088,27 @@ CK_RV pkcs11_config_key(pkcs11_lib_ctx_ptr pLibCtx, pkcs11_slot_ctx_ptr pSlot, p
 CK_RV pkcs11_config_remove_object(pkcs11_lib_ctx_ptr pLibCtx, pkcs11_slot_ctx_ptr pSlot, pkcs11_object_ptr pObject)
 {
     char filename[200];
-    int ret = snprintf(filename, sizeof(filename), "%s%lu.%u.conf", pLibCtx->config_path,
+    int ret = 0x00;
+    if (atcab_is_ca_device(pSlot->interface_config.devtype))
+    {
+        ret = snprintf(filename, sizeof(filename), "%s%lu.%u.conf", pLibCtx->config_path,
                        pSlot->slot_id, pObject->slot);
+    }
+    else
+    {
+        ret = snprintf(filename, sizeof(filename), "%s%lu.%04x.conf", pLibCtx->config_path,
+                       pSlot->slot_id, pObject->slot);
+    }
 
     if (ret > 0 && ret < (int)sizeof(filename))
     {
         (void)remove(filename);
         if (atcab_is_ca_device(pSlot->interface_config.devtype))
         {
+#if ATCA_CA_SUPPORT
             /* coverity[cert_int34_c_violation] shift will not affect precision since slot max can be only till 15 */
             pSlot->flags |= ((CK_FLAGS)1 << pObject->slot);
+#endif
         }
     }
 
@@ -1028,10 +1119,10 @@ CK_RV pkcs11_config_remove_object(pkcs11_lib_ctx_ptr pLibCtx, pkcs11_slot_ctx_pt
 CK_RV pkcs11_config_load_objects(pkcs11_slot_ctx_ptr slot_ctx)
 {
 #ifndef _WIN32
-    DIR* d;
+    DIR* directory;
     struct dirent* de;
     FILE* fp;
-    char* buffer;
+    char* buf;
     size_t buflen;
     int argc = 0;
     CK_BYTE i = 0;
@@ -1056,13 +1147,13 @@ CK_RV pkcs11_config_load_objects(pkcs11_slot_ctx_ptr slot_ctx)
     fp = fopen(ATCA_LIBRARY_CONF, "rb");
     if (NULL != fp)
     {
-        buflen = pkcs11_config_load_file(fp, &buffer);
+        buflen = pkcs11_config_load_file(fp, &buf);
         (void)fclose(fp);
         fp = NULL;
 
         if (0u < buflen)
         {
-            if (0 < (argc = pkcs11_config_parse_buffer(buffer, buflen, sizeof(argv) / sizeof(argv[0]), argv)))
+            if (0 < (argc = pkcs11_config_parse_buffer(buf, buflen, (int)(sizeof(argv) / sizeof(argv[0])), argv)))
             {
                 if (strcmp("filestore", argv[0]) == 0)
                 {
@@ -1080,7 +1171,7 @@ CK_RV pkcs11_config_load_objects(pkcs11_slot_ctx_ptr slot_ctx)
             {
                 PKCS11_DEBUG("Failed to parse the configuration file: %s\n", ATCA_LIBRARY_CONF);
             }
-            pkcs11_os_free(buffer);
+            pkcs11_os_free(buf);
         }
     }
     else
@@ -1088,11 +1179,11 @@ CK_RV pkcs11_config_load_objects(pkcs11_slot_ctx_ptr slot_ctx)
         rv = CKR_GENERAL_ERROR;
     }
 
-    if (NULL != (d = opendir((char*)pLibCtx->config_path)))
+    if (NULL != (directory = opendir((char*)pLibCtx->config_path)))
     {
         /*Update all the conf file names*/
         /* coverity[misra_c_2012_rule_13_5_violation] readdir is needed for the loop */
-        while ((CKR_OK == rv) && (NULL != (de = readdir(d))))
+        while ((CKR_OK == rv) && (NULL != (de = readdir(directory))))
         {
             if ((uint8_t)DT_REG == de->d_type)
             {
@@ -1125,7 +1216,7 @@ CK_RV pkcs11_config_load_objects(pkcs11_slot_ctx_ptr slot_ctx)
         i = 0;
 
         /* close directory */
-        (void)closedir(d);
+        (void)closedir(directory);
     }
     else
     {
@@ -1182,7 +1273,7 @@ CK_RV pkcs11_config_load_objects(pkcs11_slot_ctx_ptr slot_ctx)
                 pkcs11_os_free(filename);
                 if (NULL != fp)
                 {
-                    buflen = pkcs11_config_load_file(fp, &buffer);
+                    buflen = pkcs11_config_load_file(fp, &buf);
 
                     if (0U < buflen)
                     {
@@ -1210,7 +1301,7 @@ CK_RV pkcs11_config_load_objects(pkcs11_slot_ctx_ptr slot_ctx)
                             else
                             {
                                 /* Load configuration untill max PKCS11 slots allowed*/
-                                pkcs11_os_free(buffer);
+                                pkcs11_os_free(buf);
                                 (void)fclose(fp);
                                 break;
                             }
@@ -1218,7 +1309,7 @@ CK_RV pkcs11_config_load_objects(pkcs11_slot_ctx_ptr slot_ctx)
 
                         if (CKR_OK == rv)
                         {
-                            if (0 < (argc = pkcs11_config_parse_buffer(buffer, buflen, sizeof(argv) / sizeof(argv[0]), argv)))
+                            if (0 < (argc = pkcs11_config_parse_buffer(buf, buflen, (int)(sizeof(argv) / sizeof(argv[0])), argv)))
                             {
                                 rv = pkcs11_config_parse_slot_file(slot_ctx, argc, argv);
                                 PKCS11_DEBUG("Load conf file status [%d] slot_id [%d]\n", slot_ctx->slot_id);
@@ -1242,7 +1333,7 @@ CK_RV pkcs11_config_load_objects(pkcs11_slot_ctx_ptr slot_ctx)
                             updateConfFileData[i]->initialized = true;
                         }
 #endif
-                        pkcs11_os_free(buffer);
+                        pkcs11_os_free(buf);
                     }
                     (void)fclose(fp);
 
@@ -1309,7 +1400,7 @@ CK_RV pkcs11_config_load_objects(pkcs11_slot_ctx_ptr slot_ctx)
                                 pkcs11_os_free(handlefilename);
                                 if (NULL != fp)
                                 {
-                                    buflen = pkcs11_config_load_file(fp, &buffer);
+                                    buflen = pkcs11_config_load_file(fp, &buf);
 
                                     if (0u < buflen)
                                     {
@@ -1324,7 +1415,7 @@ CK_RV pkcs11_config_load_objects(pkcs11_slot_ctx_ptr slot_ctx)
 
                                         if (0 != errno)
                                         {
-                                            pkcs11_os_free(buffer);
+                                            pkcs11_os_free(buf);
                                             (void)fclose(fp);
                                             break;
                                         }
@@ -1338,7 +1429,7 @@ CK_RV pkcs11_config_load_objects(pkcs11_slot_ctx_ptr slot_ctx)
                                         if (CKR_OK == rv)
                                         {
                                             (void)memset(argv, 0, sizeof(argv));
-                                            if (0 < (argc = pkcs11_config_parse_buffer(buffer, buflen, sizeof(argv) / sizeof(argv[0]), argv)))
+                                            if (0 < (argc = pkcs11_config_parse_buffer(buf, buflen, (int)(sizeof(argv) / sizeof(argv[0])), argv)))
                                             {
                                                 rv = pkcs11_config_parse_object_file(slot_ctx, handle, argc, argv);
                                                 PKCS11_DEBUG("Load Handle file status [%d] slot_id [%d]\n", slot_ctx->slot_id);
@@ -1362,7 +1453,7 @@ CK_RV pkcs11_config_load_objects(pkcs11_slot_ctx_ptr slot_ctx)
                                             /* Child conf loaded successfully*/
                                             updateConfFileData[idx]->initialized = true;
                                         }
-                                        pkcs11_os_free(buffer);
+                                        pkcs11_os_free(buf);
 
                                     }
                                     (void)fclose(fp);

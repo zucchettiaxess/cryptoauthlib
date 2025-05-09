@@ -28,6 +28,9 @@
 #include "app/wpc/wpccert_client.h"
 #include "app/wpc/zcust_def_1_signer.h"
 #include "app/wpc/zcust_def_2_device.h"
+#include "app/wpc/zcust_def_3_device.h"
+#include "app/wpc/zcust_def_4_signer.h"
+#include "app/wpc/zcust_def_5_device.h"
 #include "atcacert/atcacert_def.h"
 
 TEST_GROUP(wpccert_client);
@@ -35,7 +38,9 @@ TEST_GROUP(wpccert_client);
 TEST_SETUP(wpccert_client)
 {
     atcab_init(gCfg);
+#if !ATCA_CA2_SUPPORT
     test_assert_data_is_locked();
+#endif
 }
 
 TEST_TEAR_DOWN(wpccert_client)
@@ -49,6 +54,13 @@ TEST(wpccert_client, wpccert_read_mfg_cert)
     uint8_t cert[512];
     size_t cert_size = 0;
     ATCADevice device = atcab_get_device();
+    const atcacert_def_t* cert_def;
+
+    ret = wpccert_get_slot_info(NULL, &cert_def, NULL, NULL, NULL, 0);
+    TEST_ASSERT_SUCCESS(ret);
+
+    ret = wpccert_read_cert_size(device, cert_def->ca_cert_def, &cert_size);
+    TEST_ASSERT_SUCCESS(ret);
 
     ret = wpccert_read_mfg_cert(device, cert, &cert_size, 0);
     TEST_ASSERT_SUCCESS(ret);
@@ -60,6 +72,13 @@ TEST(wpccert_client, wpccert_read_pdu_cert)
     uint8_t cert[512];
     size_t cert_size = 0;
     ATCADevice device = atcab_get_device();
+    const atcacert_def_t* cert_def;
+
+    ret = wpccert_get_slot_info(NULL, &cert_def, NULL, NULL, NULL, 0);
+    TEST_ASSERT_SUCCESS(ret);
+
+    ret = wpccert_read_cert_size(device, cert_def, &cert_size);
+    TEST_ASSERT_SUCCESS(ret);
 
     ret = wpccert_read_pdu_cert(device, cert, &cert_size, 0);
     TEST_ASSERT_SUCCESS(ret);
@@ -72,23 +91,27 @@ TEST(wpccert_client, wpccert_mfg_public_key_no_cert)
     size_t cert_size = 0;
     uint8_t public_key[ATCA_ECCP256_PUBKEY_SIZE];
     uint8_t cert_public_key[ATCA_ECCP256_PUBKEY_SIZE];
+    cal_buffer cert_pubkey = CAL_BUF_INIT(sizeof(cert_public_key), cert_public_key);
     const atcacert_def_t* cert_def;
     ATCADevice device = atcab_get_device();
 
-    ret = wpccert_get_slot_info(NULL, &cert_def, 0);
+    ret = wpccert_get_slot_info(NULL, &cert_def, NULL, NULL, NULL, 0);
+    TEST_ASSERT_SUCCESS(ret);
+
+    ret = wpccert_read_cert_size(device, cert_def->ca_cert_def, &cert_size);
     TEST_ASSERT_SUCCESS(ret);
 
     ret = wpccert_read_mfg_cert(device, cert, &cert_size, 0);
     TEST_ASSERT_SUCCESS(ret);
 
     ret = atcacert_get_subj_public_key(
-        cert_def,
+        cert_def->ca_cert_def,
         cert,
         cert_size,
-        cert_public_key);
+        &cert_pubkey);
     TEST_ASSERT_SUCCESS(ret);
 
-    ret = wpccert_public_key(cert_def, public_key, NULL);
+    ret = wpccert_public_key(cert_def->ca_cert_def, public_key, NULL);
     TEST_ASSERT_SUCCESS(ret);
     TEST_ASSERT_EQUAL_MEMORY(cert_public_key, public_key, sizeof(public_key));
 }
@@ -100,10 +123,14 @@ TEST(wpccert_client, wpccert_mfg_public_key_cert)
     size_t cert_size = 0;
     uint8_t public_key[ATCA_ECCP256_PUBKEY_SIZE];
     uint8_t cert_public_key[ATCA_ECCP256_PUBKEY_SIZE];
+    cal_buffer cert_pubkey = CAL_BUF_INIT(sizeof(cert_public_key), cert_public_key);
     const atcacert_def_t* cert_def;
     ATCADevice device = atcab_get_device();
 
-    ret = wpccert_get_slot_info(NULL, &cert_def, 0);
+    ret = wpccert_get_slot_info(NULL, &cert_def, NULL, NULL, NULL, 0);
+    TEST_ASSERT_SUCCESS(ret);
+
+    ret = wpccert_read_cert_size(device, cert_def->ca_cert_def, &cert_size);
     TEST_ASSERT_SUCCESS(ret);
 
     ret = wpccert_read_mfg_cert(device, cert, &cert_size, 0);
@@ -113,10 +140,10 @@ TEST(wpccert_client, wpccert_mfg_public_key_cert)
         cert_def->ca_cert_def,
         cert,
         cert_size,
-        cert_public_key);
+        &cert_pubkey);
     TEST_ASSERT_SUCCESS(ret);
 
-    ret = wpccert_public_key(cert_def, public_key, cert);
+    ret = wpccert_public_key(cert_def->ca_cert_def, public_key, cert);
     TEST_ASSERT_SUCCESS(ret);
     TEST_ASSERT_EQUAL_MEMORY(cert_public_key, public_key, sizeof(public_key));
 }
@@ -129,11 +156,14 @@ TEST(wpccert_client, wpccert_pdu_public_key_no_cert)
     size_t cert_size = 0;
     uint8_t public_key[ATCA_ECCP256_PUBKEY_SIZE];
     uint8_t cert_public_key[ATCA_ECCP256_PUBKEY_SIZE];
+    cal_buffer cert_pubkey = CAL_BUF_INIT(sizeof(cert_public_key), cert_public_key);
     const atcacert_def_t* cert_def;
     ATCADevice device = atcab_get_device();
 
-    ret = wpccert_get_slot_info(NULL, &cert_def, 0);
+    ret = wpccert_get_slot_info(NULL, &cert_def, NULL, NULL, NULL, 0);
     TEST_ASSERT_SUCCESS(ret);
+
+    ret = wpccert_read_cert_size(device, cert_def, &cert_size);
 
     ret = wpccert_read_pdu_cert(device, cert, &cert_size, 0);
     TEST_ASSERT_SUCCESS(ret);
@@ -142,7 +172,7 @@ TEST(wpccert_client, wpccert_pdu_public_key_no_cert)
         cert_def,
         cert,
         cert_size,
-        cert_public_key);
+        &cert_pubkey);
     TEST_ASSERT_SUCCESS(ret);
 
     ret = wpccert_public_key(cert_def, public_key, NULL);
@@ -157,10 +187,14 @@ TEST(wpccert_client, wpccert_pdu_public_key_cert)
     size_t cert_size = 0;
     uint8_t public_key[ATCA_ECCP256_PUBKEY_SIZE];
     uint8_t cert_public_key[ATCA_ECCP256_PUBKEY_SIZE];
+    cal_buffer cert_pubkey = CAL_BUF_INIT(sizeof(cert_public_key), cert_public_key);
     const atcacert_def_t* cert_def;
     ATCADevice device = atcab_get_device();
 
-    ret = wpccert_get_slot_info(NULL, &cert_def, 0);
+    ret = wpccert_get_slot_info(NULL, &cert_def, NULL, NULL, NULL, 0);
+    TEST_ASSERT_SUCCESS(ret);
+
+    ret = wpccert_read_cert_size(device, cert_def, &cert_size);
     TEST_ASSERT_SUCCESS(ret);
 
     ret = wpccert_read_pdu_cert(device, cert, &cert_size, 0);
@@ -170,7 +204,7 @@ TEST(wpccert_client, wpccert_pdu_public_key_cert)
         cert_def,
         cert,
         cert_size,
-        cert_public_key);
+        &cert_pubkey);
     TEST_ASSERT_EQUAL(ATCACERT_E_SUCCESS, ret);
 
     ret = wpccert_public_key(cert_def, public_key, cert);
@@ -178,15 +212,34 @@ TEST(wpccert_client, wpccert_pdu_public_key_cert)
     TEST_ASSERT_EQUAL_MEMORY(cert_public_key, public_key, sizeof(public_key));
 }
 
+/** \brief Configured device is ECC608 , CA2, TA */
+bool test_wpc_cond(void)
+{
+    return (ATECC608 == atca_test_get_device_type() || atcab_is_ca2_device(atca_test_get_device_type()) \
+                            || atcab_is_ta_device(atca_test_get_device_type()));
+}
+
+/** \brief Configured device is ECC608 , TA */
+bool test_wpc_cond_ecc608_and_ta(void)
+{
+    return (ATECC608 == atca_test_get_device_type() || atcab_is_ta_device(atca_test_get_device_type()));
+}
+
 // *INDENT-OFF* - Preserve formatting
 t_test_case_info wpccert_client_unit_test_info[] =
 {
-    { REGISTER_TEST_CASE(wpccert_client, wpccert_read_mfg_cert),             DEVICE_MASK(ATECC608)},
-    { REGISTER_TEST_CASE(wpccert_client, wpccert_read_pdu_cert),             DEVICE_MASK(ATECC608)},
-    { REGISTER_TEST_CASE(wpccert_client, wpccert_mfg_public_key_no_cert),    DEVICE_MASK(ATECC608)},
-    { REGISTER_TEST_CASE(wpccert_client, wpccert_mfg_public_key_cert),       DEVICE_MASK(ATECC608)},
-    { REGISTER_TEST_CASE(wpccert_client, wpccert_pdu_public_key_no_cert),    DEVICE_MASK(ATECC608)},
-    { REGISTER_TEST_CASE(wpccert_client, wpccert_pdu_public_key_cert),       DEVICE_MASK(ATECC608)},
+    { REGISTER_TEST_CASE(wpccert_client, wpccert_read_mfg_cert),             test_wpc_cond_ecc608_and_ta},
+    { REGISTER_TEST_CASE(wpccert_client, wpccert_read_pdu_cert),             test_wpc_cond},
+#if ATCA_ECC_SUPPORT
+    { REGISTER_TEST_CASE(wpccert_client, wpccert_mfg_public_key_no_cert),    (atca_test_cond_ecc608)},
+    { REGISTER_TEST_CASE(wpccert_client, wpccert_pdu_public_key_no_cert),    atca_test_cond_ecc608},
+#endif
+#if (ATCA_ECC_SUPPORT || (ATCA_TA_SUPPORT && ATCACERT_INTEGRATION_EN))
+    { REGISTER_TEST_CASE(wpccert_client, wpccert_mfg_public_key_cert),       (test_wpc_cond_ecc608_and_ta)},
+#endif
+#if (ATCA_ECC_SUPPORT || ((ATCA_CA2_SUPPORT || ATCA_TA_SUPPORT) && ATCACERT_INTEGRATION_EN))
+    { REGISTER_TEST_CASE(wpccert_client, wpccert_pdu_public_key_cert),       test_wpc_cond},
+#endif
     { (fp_test_case)NULL,                                                    (uint8_t)0 },
 };
 // *INDENT-ON*
