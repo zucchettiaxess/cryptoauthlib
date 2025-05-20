@@ -27,11 +27,8 @@
 
 /* mbedTLS boilerplate includes */
 
-#if !defined(MBEDTLS_CONFIG_FILE)
-#include "mbedtls/config.h"
-#else
-#include MBEDTLS_CONFIG_FILE
-#endif
+#define MBEDTLS_ALLOW_PRIVATE_ACCESS
+#include "mbedTLS_config.h"
 
 #if defined(MBEDTLS_ECDSA_C)
 

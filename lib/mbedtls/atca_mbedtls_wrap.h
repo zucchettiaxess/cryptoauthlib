@@ -42,12 +42,6 @@
     (fp "MISRA C-2012 Rule 21.1" "Ignoring violations from third party libraries")
 #endif
 
-#if !defined(MBEDTLS_CONFIG_FILE)
-#include "mbedtls/config.h"
-#else
-#include MBEDTLS_CONFIG_FILE
-#endif
-
 #ifndef MBEDTLS_CMAC_C
 #define MBEDTLS_CMAC_C
 #endif

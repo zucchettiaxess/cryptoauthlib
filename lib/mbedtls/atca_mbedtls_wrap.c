@@ -25,17 +25,12 @@
  * THE AMOUNT OF FEES, IF ANY, THAT YOU HAVE PAID DIRECTLY TO MICROCHIP FOR
  * THIS SOFTWARE.
  */
+#define MBEDTLS_ALLOW_PRIVATE_ACCESS
 
 /* mbedTLS boilerplate includes */
 #include "atca_config_check.h"
 
 #ifdef ATCA_MBEDTLS
-
-#if !defined(MBEDTLS_CONFIG_FILE)
-#include "mbedtls/config.h"
-#else
-#include MBEDTLS_CONFIG_FILE
-#endif
 
 #if defined(MBEDTLS_PLATFORM_C)
 #include "mbedtls/platform.h"
@@ -635,6 +630,8 @@ ATCA_STATUS atcac_pk_init_pem(
     )
 {
     ATCA_STATUS status = ATCA_BAD_PARAM;
+    mbedtls_ctr_drbg_context ctr_drbg;
+    mbedtls_ctr_drbg_init(&ctr_drbg);
 
     if (ctx)
     {
@@ -647,10 +644,11 @@ ATCA_STATUS atcac_pk_init_pem(
         }
         else
         {
-            ret = mbedtls_pk_parse_key((mbedtls_pk_context*)ctx, buf, buflen, NULL, 0);
+            ret = mbedtls_pk_parse_key((mbedtls_pk_context*)ctx, buf, buflen, NULL, 0, mbedtls_ctr_drbg_random, &ctr_drbg);
         }
         status = (!ret) ? ATCA_SUCCESS : ATCA_FUNC_FAIL;
     }
+    mbedtls_ctr_drbg_free(&ctr_drbg);
     return status;
 }
 
@@ -719,6 +717,8 @@ ATCA_STATUS atcac_pk_sign(
     )
 {
     ATCA_STATUS status = ATCA_BAD_PARAM;
+    mbedtls_ctr_drbg_context ctr_drbg;
+    mbedtls_ctr_drbg_init(&ctr_drbg);
 
     if (ctx)
     {
@@ -736,8 +736,9 @@ ATCA_STATUS atcac_pk_sign(
             mbedtls_mpi_init(&s);
 
             //ret = mbedtls_ecdsa_sign(&mbedtls_pk_ec(*ctx)->grp, &r, &s, &mbedtls_pk_ec(*ctx)->d, digest, dig_len, NULL, NULL);
-            ret = mbedtls_ecdsa_sign_det(&mbedtls_pk_ec(ctx->mctx)->grp, &r, &s,
-                                         &mbedtls_pk_ec(ctx->mctx)->d, digest, dig_len, MBEDTLS_MD_SHA256);
+            ret = mbedtls_ecdsa_sign_det_ext(&mbedtls_pk_ec(ctx->mctx)->grp, &r, &s,
+                                         &mbedtls_pk_ec(ctx->mctx)->d, digest, dig_len, MBEDTLS_MD_SHA256,
+                                         mbedtls_ctr_drbg_random, &ctr_drbg);
 
             if (!ret)
             {
@@ -756,13 +757,19 @@ ATCA_STATUS atcac_pk_sign(
             break;
         }
         case MBEDTLS_PK_RSA:
-            ret = mbedtls_pk_sign((mbedtls_pk_context*)ctx, MBEDTLS_MD_SHA256, digest, dig_len, signature, sig_len, NULL, NULL);
+        {    
+            int sig_buff_size = *sig_len;
+            ret = mbedtls_pk_sign((mbedtls_pk_context*)ctx, MBEDTLS_MD_SHA256, digest, dig_len, 
+                                    signature, sig_buff_size, sig_len, mbedtls_ctr_drbg_random, &ctr_drbg);
             break;
+        }
         default:
             break;
         }
         status = (0 == ret) ? ATCA_SUCCESS : ATCA_FUNC_FAIL;
     }
+    
+    mbedtls_ctr_drbg_free(&ctr_drbg);
     return status;
 }
 
